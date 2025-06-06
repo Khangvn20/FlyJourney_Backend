@@ -1,0 +1,9 @@
+package repository
+
+import "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
+
+type UserRepository interface {
+	FindByEmail(email string) (*dto.User, error)
+	UpdateLastLogin(userID int) error
+	Create(user *dto.User) (*dto.User, error)
+}
