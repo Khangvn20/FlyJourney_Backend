@@ -4,7 +4,7 @@ import (
     "fmt"
     "math/rand"
     "time"
-	//"os"
+	"os"
 	"net/smtp"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
@@ -27,8 +27,8 @@ func NewEmailOTPService() service.EmailOTPService {
     }
 }
 func sendMail(to, subject, body string) error {
-      from := "khangvnv.125010122030@vtc.edu"
-    password := "khang090123"
+      from := os.Getenv("email_user")
+    password := os.Getenv("password_user")
     smtpHost := "smtp.gmail.com"
     smtpPort := "587"
 

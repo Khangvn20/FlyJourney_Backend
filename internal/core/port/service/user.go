@@ -8,5 +8,7 @@ import (
 type UserService interface {
 	Login(request *request.LoginRequest) *response.Response
 	Register(request *request.RegisterRequest) *response.Response
-	 ConfirmRegister(request *request.ConfirmRegisterRequest) *response.Response
+	ConfirmRegister(request *request.ConfirmRegisterRequest) *response.Response
+	ConfirmResetPassword(request *request.ConfirmResetPasswordRequest) *response.Response
+    ResetPassword(request *request.ResetPasswordRequest) *response.Response
 }

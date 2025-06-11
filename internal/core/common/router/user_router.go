@@ -20,6 +20,8 @@ func SetupRouter(userController *controller.UserController) *gin.Engine {
 		userRoutes.POST("/register", userController.Register)
 		userRoutes.POST("/login", userController.Login)
 		userRoutes.POST("/confirm-register", userController.ConfirmRegister)
+		userRoutes.POST("/reset-password", userController.ResetPassword)
+		userRoutes.POST("/confirm-reset-password", userController.ConfirmResetPassword)
 	}
 
 	return r

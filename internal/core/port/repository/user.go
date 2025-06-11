@@ -6,4 +6,5 @@ type UserRepository interface {
 	FindByEmail(email string) (*dto.User, error)
 	UpdateLastLogin(userID int) error
 	Create(user *dto.User) (*dto.User, error)
+	UpdatePassword(userID int, newPassword string) error
 }

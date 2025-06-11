@@ -15,12 +15,15 @@ import (
 type userService struct {
 	userRepo repository.UserRepository
 	emailOTPService service.EmailOTPService
+	tokenService service.TokenService
 }
 
-func NewUserService(userRepo repository.UserRepository , emailOTPService service.EmailOTPService) service.UserService {
+func NewUserService(userRepo repository.UserRepository , emailOTPService service.EmailOTPService, tokenService service.TokenService ) service.UserService {
 	return &userService{
 		userRepo: userRepo,
 		emailOTPService:  emailOTPService,
+		tokenService: tokenService,
+	
 	}
 }
 
@@ -83,78 +86,62 @@ func (s *userService) Register(req *request.RegisterRequest) *response.Response 
     }
 	
 }
-
 func (s *userService) Login(req *request.LoginRequest) *response.Response {
-	// Validate email format
-	if !validateEmail(req.Email) {
-		return handleValidationErrors("Email is invalid")
-	}
-	user, err := s.userRepo.FindByEmail(req.Email)
-	if err != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
+	  user, err := s.userRepo.FindByEmail(req.Email)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if user == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Email hoặc mật khẩu không đúng",
+        }
+    }
+	  err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Email hoặc mật khẩu không đúng",
+        }
+    }
 
-	if user == nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InvalidRequest,
-			ErrorMessage: "Email hoặc mật khẩu không đúng",
-		}
-	}
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
-	if err != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InvalidRequest,
-			ErrorMessage: "Email hoặc mật khẩu không đúng",
-		}
-	}
+    tokenDuration := time.Hour * 24
+    token, err := s.tokenService.GenerateToken(user.UserID, tokenDuration)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
 
-	// Tạo JWT token
-	tokenService := NewTokenService()
-	token, expireAt, err := tokenService.GenerateToken(user)
-	if err != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
-	_ = s.userRepo.UpdateLastLogin(user.UserID)
-   loginData := map[string]interface{}{
-    "user_id":   user.UserID,
-    "email":     user.Email,
-    "name":      user.Name,
-    "role":      user.Role,
-    "token":     token,
-    "expire_at": expireAt,
+    // 5. Trả về response
+    return &response.Response{
+        Status:    true,
+        ErrorCode: error_code.Success,
+        Data: map[string]interface{}{
+            "user_id":   user.UserID,
+            "email":     user.Email,
+            "name":      user.Name,
+            "role":      user.Role,
+            "token":     token,
+           
+        },
+        ErrorMessage: error_code.SuccessErrMsg,
+    }
 }
-	loginResponse := &response.Response{
-	 Data:         loginData,
-    Status:       true,
-    ErrorCode:    error_code.Success,
-    ErrorMessage: "Login success",
-	}
 
-	return &response.Response{
-		Data:         loginResponse,
-		Status:       true,
-		ErrorCode:    error_code.Success,
-		ErrorMessage: error_code.SuccessErrMsg,
-	}
-}
 func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *response.Response {
-    // 1. Xác thực OTP email
     otpResult := s.emailOTPService.VerifyEmail(req.Email, req.OTP)
     if !otpResult.Status {
         return otpResult
     }
-
-    // 2. Kiểm tra lại email đã tồn tại chưa (tránh race condition)
     userExist, err := s.userRepo.FindByEmail(req.Email)
     if err != nil {
         return &response.Response{
@@ -208,5 +195,79 @@ func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *resp
         Status:       true,
         ErrorCode:    error_code.Success,
         ErrorMessage: error_code.SuccessErrMsg,
+    }
+}
+func (s *userService) ResetPassword(req *request.ResetPasswordRequest) *response.Response {
+    user, err := s.userRepo.FindByEmail(req.Email)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if user == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Email không tồn tại",
+        }
+    }
+    // 3. Gửi OTP đến email
+    otpResult := s.emailOTPService.SendOTPEmail(req.Email)
+    if !otpResult.Status {
+        return otpResult
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Đã gửi OTP xác thực đến email, vui lòng kiểm tra email.",
+    }
+}
+
+
+func (s *userService) ConfirmResetPassword(req *request.ConfirmResetPasswordRequest) *response.Response {
+    otpResult := s.emailOTPService.VerifyEmail(req.Email, req.OTP)
+    if !otpResult.Status {
+        return otpResult
+    }
+    user, err := s.userRepo.FindByEmail(req.Email)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if user == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Email không tồn tại",
+        }
+    }
+
+    hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    user.Password = string(hashed)
+    user.UpdatedAt = time.Now()
+    err = s.userRepo.UpdatePassword(user.UserID, string(hashed))
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Đặt lại mật khẩu thành công",
     }
 }

@@ -30,10 +30,6 @@ func (r *userRepository) FindByEmail(email string) (*dto.User, error) {
 
 	var user dto.User
 	var lastLogin *time.Time
-
-	// Thêm log để debug
-	log.Printf("Executing FindByEmail query for email: %s", email)
-
 	err := r.db.QueryRow(context.Background(), query, email).Scan(
 		&user.UserID,
 		&user.Email,
@@ -102,4 +98,14 @@ func (r *userRepository) UpdateLastLogin(userID int) error {
 		return err
 	}
 	return nil
+}
+func (r *userRepository) UpdatePassword(userID int, newPassword string) error {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    query := `UPDATE users SET password = $1, updated_at = $2 WHERE user_id = $3`
+    _, err := r.db.Exec(ctx, query, newPassword, time.Now(), userID)
+    if err != nil {
+        return err
+    }
+    return nil
 }

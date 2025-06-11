@@ -77,3 +77,21 @@ func (c *UserController) ConfirmRegister(ctx *gin.Context) {
     result := c.userService.ConfirmRegister(&req)
     ctx.JSON(200, result)
 }
+func (c *UserController) ResetPassword(ctx *gin.Context) {
+	var req request.ResetPasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(400, gin.H{"status": false, "errorMessage": err.Error()})
+		return
+	}
+	result := c.userService.ResetPassword(&req)
+	ctx.JSON(200, result)
+}
+func (c *UserController) ConfirmResetPassword(ctx *gin.Context) {
+	var req request.ConfirmResetPasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(400, gin.H{"status": false, "errorMessage": err.Error()})
+		return
+	}	
+	result := c.userService.ConfirmResetPassword(&req)
+	ctx.JSON(200, result)
+}
