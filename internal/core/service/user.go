@@ -14,36 +14,26 @@ import (
 
 type userService struct {
 	userRepo repository.UserRepository
+	emailOTPService service.EmailOTPService
 }
 
-func NewUserService(userRepo repository.UserRepository) service.UserService {
+func NewUserService(userRepo repository.UserRepository , emailOTPService service.EmailOTPService) service.UserService {
 	return &userService{
 		userRepo: userRepo,
+		emailOTPService:  emailOTPService,
 	}
 }
 
-// validateName returns false if the name is only digits or empty, else true
 func validateName(name string) bool {
 	re := regexp.MustCompile(`^\d+$`)
 	return name != "" && !re.MatchString(name)
 }
 
-// validateEmail returns true if email is valid
 func validateEmail(email string) bool {
 	re := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 	return re.MatchString(email)
 }
 
-// validatePhone returns true if phone is valid (optional field)
-func validatePhone(phone string) bool {
-	if phone == "" {
-		return true
-	}
-	re := regexp.MustCompile(`^\d{10,15}$`)
-	return re.MatchString(phone)
-}
-
-// handleValidationErrors helps to reduce code duplication for responses
 func handleValidationErrors(message string) *response.Response {
 	return &response.Response{
 		Status:       false,
@@ -65,11 +55,6 @@ func (s *userService) Register(req *request.RegisterRequest) *response.Response 
 	if !validateName(req.Name) {
 		return handleValidationErrors("Name is required and must not be a number")
 	}
-	// Validate phone if provided
-	if !validatePhone(req.Phone) {
-		return handleValidationErrors("Phone is invalid")
-	}
-
 	// Check if email exists
 	userExist, err := s.userRepo.FindByEmail(req.Email)
 	if err != nil {
@@ -86,48 +71,17 @@ func (s *userService) Register(req *request.RegisterRequest) *response.Response 
 			ErrorMessage: "Email đã tồn tại",
 		}
 	}
+     otpResult := s.emailOTPService.SendOTPEmail(req.Email)
+    if !otpResult.Status {
+        return otpResult
+    }
 
-	// Hash password
-	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
-
-	now := time.Now()
-	user := &dto.User{
-		Email:     req.Email,
-		Password:  string(hashed),
-		Name:      req.Name,
-		Phone:     req.Phone,
-		Role:      "user",
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-
-	newUser, err := s.userRepo.Create(user)
-	if err != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
-
-	data := response.RegisterResponse{
-		UserID: newUser.UserID,
-		Email:  newUser.Email,
-		Name:   newUser.Name,
-	}
-	return &response.Response{
-		Data:         data,
-		Status:       true,
-		ErrorCode:    error_code.Success,
-		ErrorMessage: error_code.SuccessErrMsg,
-	}
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Đã gửi OTP xác thực email, vui lòng kiểm tra email.",
+    }
+	
 }
 
 func (s *userService) Login(req *request.LoginRequest) *response.Response {
@@ -171,15 +125,19 @@ func (s *userService) Login(req *request.LoginRequest) *response.Response {
 		}
 	}
 	_ = s.userRepo.UpdateLastLogin(user.UserID)
-
-	// Tạo response
-	loginResponse := &response.LoginResponse{
-		UserID:   user.UserID,
-		Email:    user.Email,
-		Name:     user.Name,
-		Role:     user.Role,
-		Token:    token,
-		ExpireAt: expireAt,
+   loginData := map[string]interface{}{
+    "user_id":   user.UserID,
+    "email":     user.Email,
+    "name":      user.Name,
+    "role":      user.Role,
+    "token":     token,
+    "expire_at": expireAt,
+}
+	loginResponse := &response.Response{
+	 Data:         loginData,
+    Status:       true,
+    ErrorCode:    error_code.Success,
+    ErrorMessage: "Login success",
 	}
 
 	return &response.Response{
@@ -188,4 +146,67 @@ func (s *userService) Login(req *request.LoginRequest) *response.Response {
 		ErrorCode:    error_code.Success,
 		ErrorMessage: error_code.SuccessErrMsg,
 	}
+}
+func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *response.Response {
+    // 1. Xác thực OTP email
+    otpResult := s.emailOTPService.VerifyEmail(req.Email, req.OTP)
+    if !otpResult.Status {
+        return otpResult
+    }
+
+    // 2. Kiểm tra lại email đã tồn tại chưa (tránh race condition)
+    userExist, err := s.userRepo.FindByEmail(req.Email)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if userExist != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.DuplicateUser,
+            ErrorMessage: "Email đã tồn tại",
+        }
+    }
+
+    // 3. Hash password
+    hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+
+    now := time.Now()
+    user := &dto.User{
+        Email:     req.Email,
+        Password:  string(hashed),
+        Name:      req.Name,
+        Role:      "user",
+        CreatedAt: now,
+        UpdatedAt: now,
+    }
+    newUser, err := s.userRepo.Create(user)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+
+    return &response.Response{
+        Data: map[string]interface{}{
+            "user_id": newUser.UserID,
+            "email":   newUser.Email,
+            "name":    newUser.Name,
+        },
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: error_code.SuccessErrMsg,
+    }
 }

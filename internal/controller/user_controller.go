@@ -68,3 +68,12 @@ func (c *UserController) Login(ctx *gin.Context) {
 
 	ctx.JSON(statusCode, result)
 }
+func (c *UserController) ConfirmRegister(ctx *gin.Context) {
+    var req request.ConfirmRegisterRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(400, gin.H{"status": false, "errorMessage": err.Error()})
+        return
+    }
+    result := c.userService.ConfirmRegister(&req)
+    ctx.JSON(200, result)
+}

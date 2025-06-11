@@ -10,9 +10,12 @@ import (
 	"github.com/joho/godotenv"
 	"log"
 	"time"
+	"os"
 )
 
 func main() {
+	wd, _ := os.Getwd()
+log.Println("Current working directory:", wd)
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -31,7 +34,9 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 
 	//init service
-	userService := service.NewUserService(userRepo)
+	emailOTPService := service.NewEmailOTPService()
+	userService := service.NewUserService(userRepo,emailOTPService)
+
 	//init controler
 	userController := controller.NewUserController(userService)
 	r := router.SetupRouter(userController)
