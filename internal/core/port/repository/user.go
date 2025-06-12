@@ -7,4 +7,5 @@ type UserRepository interface {
 	UpdateLastLogin(userID int) error
 	Create(user *dto.User) (*dto.User, error)
 	UpdatePassword(userID int, newPassword string) error
+	GetUserByID(userID int) (*dto.User, error)
 }

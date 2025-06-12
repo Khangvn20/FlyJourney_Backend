@@ -6,14 +6,13 @@ import (
     "fmt"
     "log"
     "net/http"
-   
     "time"
-
     "github.com/Khangvn20/FlyJourney_Backend/internal/controller"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/router"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/utils"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/service"
     "github.com/Khangvn20/FlyJourney_Backend/internal/infra/repository"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/middleware"
     "github.com/gin-gonic/gin"
     "github.com/joho/godotenv"
 )
@@ -54,7 +53,12 @@ func NewHTTPServer(port int) (*Server, error) {
     userController := controller.NewUserController(userService)
 
     // Setup router
-    r := router.SetupRouter(userController)
+    r := gin.Default()
+    r.Use(gin.Recovery())
+    r.Use(gin.Logger())
+    apiV1 := r.Group("/api/v1")
+  
+   router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
 
     // Create server
     return &Server{

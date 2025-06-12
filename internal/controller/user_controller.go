@@ -95,3 +95,46 @@ func (c *UserController) ConfirmResetPassword(ctx *gin.Context) {
 	result := c.userService.ConfirmResetPassword(&req)
 	ctx.JSON(200, result)
 }
+func (c *UserController) Logout(ctx *gin.Context) {
+    tokenString := ctx.GetHeader("Authorization")
+    if tokenString == "" {
+        ctx.JSON(400, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": "Authorization header is required",
+            "data":         nil,
+        })
+        return
+    }
+    result := c.userService.Logout(tokenString)
+    var statusCode int
+    if result.Status {
+        statusCode = 200
+    } else {
+        statusCode = 400
+    }
+    ctx.JSON(statusCode, result)
+}
+func (c *UserController) GetUserInfo(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(400, gin.H{
+			"status":       false,
+			"errorCode":    "INVALID_REQUEST",
+			"errorMessage": "User ID not found in context",
+			"data":         nil,
+		})
+		return
+	}
+
+	result := c.userService.GetUserInfo(userID.(int))
+
+	var statusCode int
+	if result.Status {
+		statusCode = 200
+	} else {
+		statusCode = 400
+	}
+
+	ctx.JSON(statusCode, result)
+}

@@ -271,3 +271,41 @@ func (s *userService) ConfirmResetPassword(req *request.ConfirmResetPasswordRequ
         ErrorMessage: "Đặt lại mật khẩu thành công",
     }
 }
+func (s *userService) Logout(tokenString string) *response.Response {
+    err := s.tokenService.DeleteToken(tokenString)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "success",
+    }
+}
+func (s *userService) GetUserInfo(userID int) *response.Response {
+    user, err := s.userRepo.GetUserByID(userID)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if user == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "User not found",
+        }
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: error_code.SuccessErrMsg,
+        Data:         user, 
+    }
+}

@@ -10,5 +10,7 @@ type UserService interface {
 	Register(request *request.RegisterRequest) *response.Response
 	ConfirmRegister(request *request.ConfirmRegisterRequest) *response.Response
 	ConfirmResetPassword(request *request.ConfirmResetPasswordRequest) *response.Response
-    ResetPassword(request *request.ResetPasswordRequest) *response.Response
+	ResetPassword(request *request.ResetPasswordRequest) *response.Response
+	Logout(token string) *response.Response
+	GetUserInfo(userID int) *response.Response
 }

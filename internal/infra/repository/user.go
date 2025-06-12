@@ -109,3 +109,40 @@ func (r *userRepository) UpdatePassword(userID int, newPassword string) error {
     }
     return nil
 }
+func (r *userRepository) GetUserByID(userID int) (*dto.User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT user_id, email, name, phone, role, created_at, updated_at, last_login 
+		FROM users 
+		WHERE user_id = $1 
+		LIMIT 1
+	`
+
+	var user dto.User
+	var lastLogin *time.Time
+	err := r.db.QueryRow(ctx, query, userID).Scan(
+		&user.UserID,
+		&user.Email,
+		&user.Name,
+		&user.Phone,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&lastLogin,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		log.Printf("No user found with ID: %d", userID)
+		return nil, nil
+	}
+
+	if err != nil {
+		log.Printf("Error in GetUserByID: %v", err)
+		return nil, err
+	}
+
+	user.LastLogin = lastLogin
+	return &user, nil
+}

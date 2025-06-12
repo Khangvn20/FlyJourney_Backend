@@ -10,11 +10,12 @@ import (
 
 type jwtTokenService struct {
     secret []byte
+    revokedTokens  map[string]struct{}
 }
 
 func NewTokenService() service.TokenService {
     secret := []byte(os.Getenv("JWT_SECRET"))
-    return &jwtTokenService{secret: secret}
+    return &jwtTokenService{secret: secret , revokedTokens: make(map[string]struct{})}
 }
 
 func (j *jwtTokenService) GenerateToken(userID int, duration time.Duration) (string, error) {
@@ -27,6 +28,9 @@ func (j *jwtTokenService) GenerateToken(userID int, duration time.Duration) (str
 }
 
 func (j *jwtTokenService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
+      if _, revoked := j.revokedTokens[tokenString]; revoked {
+        return nil, jwt.ErrSignatureInvalid 
+    }
     token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
         if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
             return nil, jwt.ErrSignatureInvalid
@@ -40,4 +44,8 @@ func (j *jwtTokenService) ValidateToken(tokenString string) (jwt.MapClaims, erro
         return claims, nil
     }
     return nil, jwt.ErrSignatureInvalid
+}
+func (j *jwtTokenService) DeleteToken(tokenString string) error {
+    j.revokedTokens[tokenString] = struct{}{}
+    return nil
 }

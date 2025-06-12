@@ -8,4 +8,5 @@ import (
 type TokenService interface {
     GenerateToken(userID int, duration time.Duration) (string, error)
     ValidateToken(tokenString string) (jwt.MapClaims, error)
+    DeleteToken(tokenString string) error
 }
