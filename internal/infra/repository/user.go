@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"time"
+	"fmt"
 )
 
 type userRepository struct {
@@ -145,4 +146,26 @@ func (r *userRepository) GetUserByID(userID int) (*dto.User, error) {
 
 	user.LastLogin = lastLogin
 	return &user, nil
+}
+func (r *userRepository) UpdateProfile(userID int, user *dto.User) (*dto.User, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    // Add logging
+    log.Printf("Executing DB query to update profile for user ID: %d with name: %s, phone: %s", 
+        userID, user.Name, user.Phone)
+    
+    query := `UPDATE users SET name = $1, phone = $2, updated_at = $3 WHERE user_id = $4`
+    result, err := r.db.Exec(ctx, query, user.Name, user.Phone, time.Now(), userID)
+    if err != nil {
+        log.Printf("Database error updating user profile: %v", err)
+        return nil, err
+    }
+   rowsAffected:= result.RowsAffected()
+    if rowsAffected == 0 {
+        log.Printf("No rows were updated for user ID: %d", userID)
+        return nil, fmt.Errorf("no rows updated")
+    }   
+    log.Printf("Successfully updated %d rows for user ID: %d", rowsAffected, userID)
+    return r.GetUserByID(userID)
 }

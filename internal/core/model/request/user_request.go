@@ -23,3 +23,8 @@ type ConfirmResetPasswordRequest struct {
 type ResetPasswordRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
+type UpdateProfileRequest struct {
+    Name  string `json:"name" `
+    Phone string `json:"phone" `
+	Email string `json:"email"`
+}

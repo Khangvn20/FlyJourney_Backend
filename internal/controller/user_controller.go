@@ -138,3 +138,35 @@ func (c *UserController) GetUserInfo(ctx *gin.Context) {
 
 	ctx.JSON(statusCode, result)
 }
+func (c *UserController) UpdateProfile(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(400, gin.H{
+			"status":       false,
+			"errorCode":    "INVALID_REQUEST",	
+			"errorMessage": "User ID not found in context",
+			"data":         nil,
+		})
+		return
+	} 
+	    var req request.UpdateProfileRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(400, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+            "data":         nil,
+        })
+        return
+    }
+    
+ result := c.userService.UpdateProfile(userID.(int), &req)
+		var statusCode int
+	if result.Status {
+		statusCode = 200
+	} else {
+		statusCode = 400
+	}
+
+	ctx.JSON(statusCode, result)
+}

@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"regexp"
 	"time"
+    "log"
 )
 
 type userService struct {
@@ -307,5 +308,56 @@ func (s *userService) GetUserInfo(userID int) *response.Response {
         ErrorCode:    error_code.Success,
         ErrorMessage: error_code.SuccessErrMsg,
         Data:         user, 
+    }
+}
+// Fix the UpdateProfile method where the error is occurring
+
+func (s *userService) UpdateProfile(userID int, req *request.UpdateProfileRequest) *response.Response {
+    existingUser, err := s.userRepo.GetUserByID(userID)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if existingUser == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "User not found",
+        }
+    }
+    updatedUser := &dto.User{
+        UserID: userID,
+        Name:   req.Name,
+        Phone:  req.Phone,
+    }
+
+    if req.Name != "" {
+        updatedUser.Name = req.Name
+    } else {
+        updatedUser.Name = existingUser.Name
+    }
+    
+    if req.Phone != "" {
+        updatedUser.Phone = req.Phone
+    } else {
+        updatedUser.Phone = existingUser.Phone
+    }
+      updatedUserResult, err := s.userRepo.UpdateProfile(userID, updatedUser)
+    if err != nil {
+        log.Printf("Error updating profile: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Profile updated successfully",
+        Data:         updatedUserResult,
     }
 }

@@ -57,10 +57,8 @@ func NewHTTPServer(port int) (*Server, error) {
     r.Use(gin.Recovery())
     r.Use(gin.Logger())
     apiV1 := r.Group("/api/v1")
-  
+   router.AuthRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
    router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
-
-    // Create server
     return &Server{
         Engine: r,
         Port:   port,
