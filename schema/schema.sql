@@ -22,9 +22,5 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
 );
 
 CREATE INDEX idx_revoked_tokens_token ON revoked_tokens (token);
-
--- Index để tìm kiếm theo user_id
 CREATE INDEX idx_revoked_tokens_user_id ON revoked_tokens (user_id);
-
--- Index để tối ưu việc xóa token hết hạn
 CREATE INDEX idx_revoked_tokens_expiry ON revoked_tokens (expiry_at);

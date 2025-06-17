@@ -43,22 +43,27 @@ func NewHTTPServer(port int) (*Server, error) {
 
     // Initialize repository
     userRepo := repository.NewUserRepository(db)
-
+    flightRepo := repository.NewFlightRepository(db.GetPool())
     // Initialize services
     emailOTPService := service.NewEmailOTPService()
     tokenService := utils.NewTokenService()
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
+    flightService := service.NewFlightService(flightRepo)
+
 
     // Initialize controller
     userController := controller.NewUserController(userService)
+    flightController := controller.NewFlightController(flightService)
+
 
     // Setup router
     r := gin.Default()
     r.Use(gin.Recovery())
     r.Use(gin.Logger())
     apiV1 := r.Group("/api/v1")
-   router.AuthRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
-   router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
+    router.AuthRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
+    router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
+    router.FlightRoutes(apiV1, flightController, middleware.AuthMiddleware(tokenService))
     return &Server{
         Engine: r,
         Port:   port,
