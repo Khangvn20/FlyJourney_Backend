@@ -271,6 +271,7 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
         req.DepartureAirport,
         req.ArrivalAirport,
         req.DepartureDate,
+        req.ArrivalDate,
         req.FlightClass,
         airlineIDs,
         maxStops,

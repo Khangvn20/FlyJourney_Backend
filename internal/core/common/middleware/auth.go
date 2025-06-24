@@ -60,6 +60,9 @@ func AuthMiddleware(tokenService service.TokenService) gin.HandlerFunc {
         }
 
         ctx.Set("userID", userID)
+        if role, exists := claims["role"].(string); exists {
+            ctx.Set("userRole", role)
+        }
         ctx.Next()
     }
 }

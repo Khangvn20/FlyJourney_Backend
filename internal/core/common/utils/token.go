@@ -18,15 +18,17 @@ func NewTokenService() service.TokenService {
     return &jwtTokenService{secret: secret , revokedTokens: make(map[string]struct{})}
 }
 
-func (j *jwtTokenService) GenerateToken(userID int, duration time.Duration) (string, error) {
+func (j *jwtTokenService) GenerateToken(userID int, role string, duration time.Duration) (string, error) {
     claims := jwt.MapClaims{
         "user_id": strconv.Itoa(userID),
+        "role":    role,      
         "exp":     time.Now().Add(duration).Unix(),
+        "iat":     time.Now().Unix(),
     }
+    
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
     return token.SignedString(j.secret)
 }
-
 func (j *jwtTokenService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
       if _, revoked := j.revokedTokens[tokenString]; revoked {
         return nil, jwt.ErrSignatureInvalid 

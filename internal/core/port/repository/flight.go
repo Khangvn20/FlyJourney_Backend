@@ -19,6 +19,7 @@ type FlightRepository interface {
         departureAirport string,
         arrivalAirport string,
         departureDate time.Time,
+        arrivalDate *time.Time,
         flightClass string,
         airlineIDs []int,
         maxStops int,

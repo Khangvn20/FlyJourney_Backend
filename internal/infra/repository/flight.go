@@ -5,6 +5,7 @@ import (
     "log"
     "time" 
     "database/sql"
+    "github.com/lib/pq"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
     "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgxpool"
@@ -19,20 +20,16 @@ func NewFlightRepository(db *pgxpool.Pool) *flightRepository {
 func (r *flightRepository) CreateFlight(flight *dto.Flight) (*dto.Flight, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
-    
-    // Bắt đầu transaction
     tx, err := r.db.Begin(ctx)
     if err != nil {
         return nil, fmt.Errorf("failed to begin transaction: %w", err)
     }
     defer tx.Rollback(ctx)
-    
-    // Query insert flight
     query := `
-        INSERT INTO flights (airline_id, aircraft_id, flight_number, departure_airport, arrival_airport, 
-                           departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees, 
-                           status, gate, terminal, distance, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        INSERT INTO flights (airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
+                           departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
+                           status, gate, terminal, distance, total_seats, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         RETURNING flight_id
     `
     
@@ -43,7 +40,7 @@ func (r *flightRepository) CreateFlight(flight *dto.Flight) (*dto.Flight, error)
         flight.AirlineID, flight.AircraftID, flight.FlightNumber, flight.DepartureAirport,
         flight.ArrivalAirport, flight.DepartureTime, flight.ArrivalTime, flight.DurationMinutes,
         flight.StopsCount, flight.TaxAndFees, flight.Status, flight.Gate, flight.Terminal,
-        flight.Distance, now, now).Scan(&flightID)
+        flight.Distance, flight.TotalSeats, now, now).Scan(&flightID)
         
     if err != nil {
         return nil, fmt.Errorf("failed to create flight: %w", err)
@@ -52,8 +49,6 @@ func (r *flightRepository) CreateFlight(flight *dto.Flight) (*dto.Flight, error)
     flight.FlightID = flightID
     flight.CreatedAt = now
     flight.UpdatedAt = now
-    
-    // Commit transaction
     if err := tx.Commit(ctx); err != nil {
         return nil, fmt.Errorf("failed to commit transaction: %w", err)
     }
@@ -70,14 +65,17 @@ func (r *flightRepository) CreateFlightClasses(flightID int, classes []*dto.Flig
     }
     defer tx.Rollback(ctx)
     createdClasses := make([]*dto.FlightClass, 0, len(classes))
-    for _, fc := range classes {
-        query :=  `INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats)
+    totalSeats := 0
+   for _, fc := range classes {
+        query := `
+            INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING flight_class_id
         `
+        
         var flightClassID int
         err := tx.QueryRow(ctx, query,
-             flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats).Scan(&flightClassID)
+            flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats).Scan(&flightClassID)
              
         if err != nil {
             log.Printf("Error creating flight class: %v", err)
@@ -87,7 +85,20 @@ func (r *flightRepository) CreateFlightClasses(flightID int, classes []*dto.Flig
         fc.FlightClassID = flightClassID
         fc.FlightID = flightID
         createdClasses = append(createdClasses, fc)
+        totalSeats += fc.TotalSeats
     }
+     updateQuery := `
+        UPDATE flights 
+        SET total_seats = $1 
+        WHERE flight_id = $2
+    `
+    
+    _, err = tx.Exec(ctx, updateQuery, totalSeats, flightID)
+    if err != nil {
+        log.Printf("Error updating flight total_seats: %v", err)
+        return nil, err
+    }
+
     if err := tx.Commit(ctx); err != nil {
         log.Printf("Error committing transaction: %v", err)
         return nil, err
@@ -528,6 +539,7 @@ func (r *flightRepository) SearchFlights(
     departureAirport string,
     arrivalAirport string, 
     departureDate time.Time, 
+    arrivalDate *time.Time, 
     class string, 
     airlineIDs []int, 
     maxStops int, 
@@ -535,15 +547,19 @@ func (r *flightRepository) SearchFlights(
     limit int,
     sortBy string,
     sortOrder string,
-) ([]*dto.FlightSearchResult, error) {
-    // Thêm log để debug
-    log.Printf("Tìm kiếm chuyến bay: từ %s đến %s vào ngày %s, hạng ghế: %s", 
-        departureAirport, arrivalAirport, departureDate.Format("2006-01-02"), class)
-    
+) ([]*dto.FlightSearchResult, error) {  
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
     
-    // Tạo câu truy vấn cơ bản với thêm log
+    log.Printf("Tìm kiếm chuyến bay: từ %s đến %s vào ngày %s", 
+        departureAirport, arrivalAirport, departureDate.Format("2006-01-02"))
+    args := []interface{}{
+        departureAirport,
+        arrivalAirport,
+        departureDate,
+    }
+    argIndex := 4
+    
     baseQuery := `
         SELECT f.flight_id, f.airline_id, a.name as airline_name, f.flight_number, 
                f.departure_airport, f.arrival_airport, f.departure_time, f.arrival_time, 
@@ -557,24 +573,52 @@ func (r *flightRepository) SearchFlights(
         WHERE f.departure_airport = $1 
         AND f.arrival_airport = $2 
         AND f.departure_time::date = $3::date
-        AND fc.class = $4
-        AND fc.available_seats > 0
     `
+    if arrivalDate != nil {
+        baseQuery += fmt.Sprintf(" AND f.arrival_time::date = $%d::date", argIndex)
+        args = append(args, *arrivalDate)
+        argIndex++
+    }
+    baseQuery += fmt.Sprintf(" AND fc.class = $%d", argIndex)
+    args = append(args, class)
+    argIndex++
+    if len(airlineIDs) > 0 {
+        baseQuery += fmt.Sprintf(" AND f.airline_id = ANY($%d::int[])", argIndex)
+        args = append(args, pq.Array(airlineIDs))
+        argIndex++
+    }
     
-    // Log câu truy vấn và tham số
-    log.Printf("Câu truy vấn SQL: %s", baseQuery)
-    log.Printf("Tham số: %s, %s, %s, %s", 
-        departureAirport, arrivalAirport, departureDate.Format("2006-01-02"), class)
+    // Thêm điều kiện cho max_stops nếu được cung cấp
+    if maxStops >= 0 {
+        baseQuery += fmt.Sprintf(" AND f.stops_count <= $%d", argIndex)
+        args = append(args, maxStops)
+        argIndex++
+    }
     
-    // Thực thi truy vấn và kiểm tra kết quả
-    rows, err := r.db.Query(ctx, baseQuery, departureAirport, arrivalAirport, departureDate, class)
+    // Thêm sắp xếp
+    if sortBy != "" {
+        baseQuery += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
+    } else {
+        baseQuery += " ORDER BY f.departure_time ASC"
+    }
+    
+    // Thêm phân trang
+    if limit > 0 {
+        offset := (page - 1) * limit
+        baseQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+        args = append(args, limit, offset)
+    }
+    
+    log.Printf("Executing query: %s with %d args", baseQuery, len(args))
+    
+    // Thực thi truy vấn
+    rows, err := r.db.Query(ctx, baseQuery, args...)
     if err != nil {
         log.Printf("Lỗi khi thực thi truy vấn tìm kiếm chuyến bay: %v", err)
         return nil, fmt.Errorf("lỗi truy vấn chuyến bay: %w", err)
     }
     defer rows.Close()
     
-    // Xử lý kết quả với log bổ sung
     results := []*dto.FlightSearchResult{}
     rowCount := 0
     
@@ -621,13 +665,12 @@ func (r *flightRepository) SearchFlights(
         results = append(results, &result)
     }
     
-    log.Printf("Tìm thấy %d chuyến bay phù hợp với tiêu chí", rowCount)
-    
     if err := rows.Err(); err != nil {
         log.Printf("Lỗi khi lặp qua kết quả tìm kiếm: %v", err)
         return nil, fmt.Errorf("lỗi khi lặp qua chuyến bay: %w", err)
     }
     
+    log.Printf("Tìm thấy %d chuyến bay phù hợp", len(results))
     return results, nil
 }
 func (r *flightRepository) Count() (int, error) {

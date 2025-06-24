@@ -90,6 +90,7 @@ func (s *userService) Register(req *request.RegisterRequest) *response.Response 
 func (s *userService) Login(req *request.LoginRequest) *response.Response {
 	  user, err := s.userRepo.FindByEmail(req.Email)
     if err != nil {
+         log.Printf("Error finding user by email: %v", err)
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InternalError,
@@ -113,16 +114,14 @@ func (s *userService) Login(req *request.LoginRequest) *response.Response {
     }
 
     tokenDuration := time.Hour * 24
-    token, err := s.tokenService.GenerateToken(user.UserID, tokenDuration)
+    token, err := s.tokenService.GenerateToken(user.UserID, string(user.Roles), tokenDuration)
     if err != nil {
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InternalError,
-            ErrorMessage: error_code.InternalErrMsg,
+            ErrorMessage: "Login failed",
         }
     }
-
-    // 5. Trả về response
     return &response.Response{
         Status:    true,
         ErrorCode: error_code.Success,
@@ -130,7 +129,7 @@ func (s *userService) Login(req *request.LoginRequest) *response.Response {
             "user_id":   user.UserID,
             "email":     user.Email,
             "name":      user.Name,
-            "role":      user.Role,
+            "role":      user.Roles,
             "token":     token,
            
         },
@@ -174,7 +173,7 @@ func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *resp
         Email:     req.Email,
         Password:  string(hashed),
         Name:      req.Name,
-        Role:      "user",
+        Roles: dto.RoleUser, 
         CreatedAt: now,
         UpdatedAt: now,
     }
@@ -214,7 +213,6 @@ func (s *userService) ResetPassword(req *request.ResetPasswordRequest) *response
             ErrorMessage: "Email không tồn tại",
         }
     }
-    // 3. Gửi OTP đến email
     otpResult := s.emailOTPService.SendOTPEmail(req.Email)
     if !otpResult.Status {
         return otpResult

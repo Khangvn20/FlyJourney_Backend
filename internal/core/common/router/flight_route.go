@@ -3,6 +3,7 @@ package router
 import (
     "github.com/Khangvn20/FlyJourney_Backend/internal/controller"
     "github.com/gin-gonic/gin"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/middleware"
 )
 func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightController, authMiddleware gin.HandlerFunc) {
     flightRoutes := rg.Group("/flights")
@@ -12,11 +13,13 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
         flightRoutes.GET("/airline/:airline_id", flightController.GetFlightsByAirline)
         flightRoutes.GET("/status/:status", flightController.GetFlightsByStatus)
         flightRoutes.POST("/search", flightController.SearchFlights)
-        //require authentication for the following routes
-        flightRoutes.POST("", authMiddleware, flightController.CreateFlight)
-        flightRoutes.PUT("/:id", authMiddleware, flightController.UpdateFlight)
-        flightRoutes.PATCH("/:id/status", authMiddleware, flightController.UpdateFlightStatus)
-
+    }
+    adminRoutes :=rg.Group("/admin/flights")
+    adminRoutes.Use(authMiddleware, middleware.RequireAdmin())
+    {
+        adminRoutes.POST("/", flightController.CreateFlight)
+        adminRoutes.PUT("/:id", flightController.UpdateFlight)
+        adminRoutes.PATCH("/:id", flightController.UpdateFlightStatus)
     }
 	}
 	

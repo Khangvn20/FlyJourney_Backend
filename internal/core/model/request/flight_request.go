@@ -44,16 +44,17 @@ type UpdateFlightStatusRequest struct {
     Status string `json:"status" binding:"required,oneof=scheduled delayed cancelled boarding departed arrived diverted"`
 }
 type FlightSearchRequest struct {
-    DepartureAirport string    `json:"departure_airport" binding:"required"`
-    ArrivalAirport   string    `json:"arrival_airport" binding:"required"`
-    DepartureDate    time.Time `json:"departure_date" binding:"required"`
-    FlightClass      string    `json:"flight_class" binding:"required"`
-    AirlineIDs       []int     `json:"airline_ids"`
-    MaxStops         int       `json:"max_stops"`
-    Page             int       `json:"page"`
-    Limit            int       `json:"limit"`
-    SortBy           string    `json:"sort_by"`
-    SortOrder        string    `json:"sort_order"`
+    DepartureAirport string     `json:"departure_airport" binding:"required"`
+    ArrivalAirport   string     `json:"arrival_airport" binding:"required"`
+    DepartureDate    time.Time  `json:"departure_date" binding:"required"`
+    ArrivalDate      *time.Time `json:"arrival_date" binding:"omitempty"` // Sửa từ required thành omitempty
+    FlightClass      string     `json:"flight_class" binding:"required"`
+    AirlineIDs       []int      `json:"airline_ids"`
+    MaxStops         int        `json:"max_stops"`
+    Page             int        `json:"page"`
+    Limit            int        `json:"limit"`
+    SortBy           string     `json:"sort_by"`
+    SortOrder        string     `json:"sort_order"`
 }
 type FlightFilterRequest struct {
     AirlineIDs      []int    `json:"airline_ids"`
