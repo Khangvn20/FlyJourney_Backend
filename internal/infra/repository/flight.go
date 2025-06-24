@@ -539,7 +539,6 @@ func (r *flightRepository) SearchFlights(
     departureAirport string,
     arrivalAirport string, 
     departureDate time.Time, 
-    arrivalDate *time.Time, 
     class string, 
     airlineIDs []int, 
     maxStops int, 
@@ -551,9 +550,9 @@ func (r *flightRepository) SearchFlights(
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
     
-    log.Printf("Tìm kiếm chuyến bay: từ %s đến %s vào ngày %s", 
-        departureAirport, arrivalAirport, departureDate.Format("2006-01-02"))
-    args := []interface{}{
+    log.Printf("Tìm kiếm chuyến bay một chiều: từ %s đến %s vào ngày %s, hạng ghế: %s", 
+    departureAirport, arrivalAirport, departureDate.Format("2006-01-02"), class)
+   args := []interface{}{
         departureAirport,
         arrivalAirport,
         departureDate,
@@ -574,11 +573,6 @@ func (r *flightRepository) SearchFlights(
         AND f.arrival_airport = $2 
         AND f.departure_time::date = $3::date
     `
-    if arrivalDate != nil {
-        baseQuery += fmt.Sprintf(" AND f.arrival_time::date = $%d::date", argIndex)
-        args = append(args, *arrivalDate)
-        argIndex++
-    }
     baseQuery += fmt.Sprintf(" AND fc.class = $%d", argIndex)
     args = append(args, class)
     argIndex++
@@ -587,22 +581,12 @@ func (r *flightRepository) SearchFlights(
         args = append(args, pq.Array(airlineIDs))
         argIndex++
     }
-    
-    // Thêm điều kiện cho max_stops nếu được cung cấp
-    if maxStops >= 0 {
-        baseQuery += fmt.Sprintf(" AND f.stops_count <= $%d", argIndex)
-        args = append(args, maxStops)
-        argIndex++
-    }
-    
-    // Thêm sắp xếp
+
     if sortBy != "" {
         baseQuery += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
     } else {
         baseQuery += " ORDER BY f.departure_time ASC"
     }
-    
-    // Thêm phân trang
     if limit > 0 {
         offset := (page - 1) * limit
         baseQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
@@ -610,8 +594,6 @@ func (r *flightRepository) SearchFlights(
     }
     
     log.Printf("Executing query: %s with %d args", baseQuery, len(args))
-    
-    // Thực thi truy vấn
     rows, err := r.db.Query(ctx, baseQuery, args...)
     if err != nil {
         log.Printf("Lỗi khi thực thi truy vấn tìm kiếm chuyến bay: %v", err)
@@ -651,15 +633,11 @@ func (r *flightRepository) SearchFlights(
         
         if err != nil {
             log.Printf("Lỗi khi quét dữ liệu chuyến bay: %v", err)
-            continue  // Bỏ qua hàng lỗi và tiếp tục
+            continue 
         }
-        
-        // Xử lý giá trị NULL
         if totalSeats.Valid {
             result.TotalSeats = int(totalSeats.Int32)
         }
-        
-        // Tính tổng giá
         result.TotalPrice = result.ClassPrice + result.TaxAndFees
         
         results = append(results, &result)
@@ -693,19 +671,15 @@ func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    // Extract just the date part for comparison
-    startDate := time.Date(departureDate.Year(), departureDate.Month(), departureDate.Day(), 0, 0, 0, 0, departureDate.Location())
-    endDate := startDate.Add(24 * time.Hour)
-
-    var count int
-    query := `
+     query := `
         SELECT COUNT(*) 
         FROM flights
         WHERE departure_airport = $1 AND arrival_airport = $2
-          AND departure_time >= $3 AND departure_time < $4
+          AND departure_time::date = $3::date
     `
 
-    err := r.db.QueryRow(ctx, query, departureAirport, arrivalAirport, startDate, endDate).Scan(&count)
+    var count int
+    err := r.db.QueryRow(ctx, query, departureAirport, arrivalAirport, departureDate).Scan(&count)
     if err != nil {
         log.Printf("Error counting flights by search: %v", err)
         return 0, err
@@ -732,3 +706,59 @@ func (r *flightRepository) UpdateStatus(id int, status string) error {
 
     return nil
 }
+func (r *flightRepository) SearchRoundtripFlights(
+    departureAirport string,
+    arrivalAirport string,
+    departureDate time.Time,
+    returnDate time.Time,
+    class string,
+    airlineIDs []int,
+    maxStops int,
+    page int,
+    limit int,
+    sortBy string,
+    sortOrder string,
+) (*dto.RoundtripSearchResult, error) {
+
+    
+    log.Printf("Tìm kiếm chuyến bay khứ hồi: từ %s đến %s, đi ngày %s, về ngày %s, hạng ghế: %s", 
+        departureAirport, arrivalAirport, departureDate.Format("2006-01-02"), 
+        returnDate.Format("2006-01-02"), class)
+
+        outboundFlights, err := r.SearchFlights(
+        departureAirport,
+        arrivalAirport,
+        departureDate,
+        class,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+    )
+        if err != nil {
+            log.Printf("Lỗi khi tìm kiếm chuyến bay đi: %v", err)
+            return nil, fmt.Errorf("lỗi tìm kiếm chuyến bay đi: %w", err)
+        }
+        inboundFlights, err := r.SearchFlights(
+        arrivalAirport,
+        departureAirport,
+        returnDate,
+        class,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        )
+        if err != nil {
+            log.Printf("Lỗi khi tìm kiếm chuyến bay về: %v", err)
+            return nil, fmt.Errorf("lỗi tìm kiếm chuyến bay về: %w", err)
+        }
+       return &dto.RoundtripSearchResult{
+        OutboundFlights: outboundFlights,
+        InboundFlights:  inboundFlights,
+    }, nil
+} 

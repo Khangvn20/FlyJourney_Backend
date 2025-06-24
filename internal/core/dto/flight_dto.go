@@ -56,3 +56,7 @@ type FlightSearchResult struct {
     ClassPrice        float64   `json:"class_price"`
     ClassAvailability int       `json:"class_availability"`
 }
+type RoundtripSearchResult struct {
+    OutboundFlights []*FlightSearchResult `json:"outbound_flights"`
+    InboundFlights  []*FlightSearchResult `json:"inbound_flights"`
+}

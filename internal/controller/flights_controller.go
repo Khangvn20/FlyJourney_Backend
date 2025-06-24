@@ -202,3 +202,17 @@ func (c *FlightController) UpdateFlightStatus(ctx *gin.Context) {
     
     ctx.JSON(statusCode, result)
 }
+func (c *FlightController) SearchRoundtripFlights(ctx *gin.Context) {
+    var req request.RoundtripFlightSearchRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+        })
+        return
+    }
+    
+    result := c.flightService.SearchRoundtripFlights(&req)
+    ctx.JSON(http.StatusOK, result)
+}

@@ -29,6 +29,20 @@ func NewHTTPServer(port int) (*Server, error) {
     if err != nil {
         return nil, fmt.Errorf("error loading .env file: %v", err)
     }
+    r:=gin.Default()
+    r.Use(func(c *gin.Context) {
+        c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+        c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+        c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+        c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+
+        if c.Request.Method == "OPTIONS" {
+            c.AbortWithStatus(204)
+            return
+        }
+
+        c.Next()
+    })
 
     // Initialize database
     db, err := repository.NewPgxDatabase()
@@ -54,7 +68,6 @@ func NewHTTPServer(port int) (*Server, error) {
     if err := db.Ping(ctx); err != nil {
         return nil, fmt.Errorf("database ping failed: %v", err)
     }
-   //config redis
    
     // Initialize repository
     userRepo := repository.NewUserRepository(db)
@@ -72,7 +85,6 @@ func NewHTTPServer(port int) (*Server, error) {
 
 
     // Setup router
-    r := gin.Default()
     r.Use(gin.Recovery())
     r.Use(gin.Logger())
     apiV1 := r.Group("/api/v1")

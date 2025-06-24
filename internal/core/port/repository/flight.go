@@ -19,7 +19,6 @@ type FlightRepository interface {
         departureAirport string,
         arrivalAirport string,
         departureDate time.Time,
-        arrivalDate *time.Time,
         flightClass string,
         airlineIDs []int,
         maxStops int,
@@ -28,9 +27,23 @@ type FlightRepository interface {
         sortBy string,
         sortOrder string,
     ) ([]*dto.FlightSearchResult, error)
+     SearchRoundtripFlights(
+        departureAirport string,
+        arrivalAirport string,
+        departureDate time.Time,
+        returnDate time.Time,
+        flightClass string,
+        airlineIDs []int,
+        maxStops int,
+        page int,
+        limit int,
+        sortBy string,
+        sortOrder string,
+    ) (*dto.RoundtripSearchResult, error)
 		//Metadata methods
 		 Count() (int, error)
     CountBySearch(departureAirport, arrivalAirport string, departureDate time.Time) (int, error)
     // Status updates
     UpdateStatus(id int, status string) error
+
 }

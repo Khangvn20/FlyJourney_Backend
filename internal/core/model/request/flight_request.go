@@ -10,7 +10,7 @@ type CreateFlightRequest struct {AirlineID        int       `json:"airline_id" b
     DepartureTime    time.Time `json:"departure_time" binding:"required"`
     ArrivalTime      time.Time `json:"arrival_time" binding:"required"`
     DurationMinutes  int       `json:"duration_minutes" binding:"required"`
-    StopsCount       int       `json:"stops_count" binding:"required"`
+    StopsCount       int       `json:"stops_count"`
     TaxAndFees       float64   `json:"tax_and_fees"`
     Status           string    `json:"status" binding:"required"`
     Gate             string    `json:"gate"`
@@ -68,4 +68,32 @@ type UpdateFlightClassRequest struct {
     BasePrice      float64 `json:"base_price" binding:"required"`
     AvailableSeats int     `json:"available_seats" binding:"required"`
     TotalSeats     int     `json:"total_seats" binding:"required"`
+}
+type RoundtripFlightSearchRequest struct {
+    DepartureAirport string     `json:"departure_airport" binding:"required"`
+    ArrivalAirport   string     `json:"arrival_airport" binding:"required"`
+    DepartureDate    time.Time `json:"departure_date" binding:"required" time_format:"2006-01-02"`
+    ReturnDate       time.Time `json:"return_date" binding:"required" time_format:"2006-01-02"`
+    FlightClass      string     `json:"flight_class" binding:"required"`
+    AirlineIDs       []int      `json:"airline_ids"`
+    MaxStops         int        `json:"max_stops"`
+    Passengers       int       `json:"passengers" binding:"required,min=1"`
+    Page             int       `json:"page"`
+    Limit            int       `json:"limit"`
+    SortBy           string    `json:"sort_by"`
+    SortOrder        string    `json:"sort_order"`
+}
+type ConvertedRoundtripRequest struct {
+    DepartureAirport string    `json:"departure_airport"`
+    ArrivalAirport   string    `json:"arrival_airport"`
+    DepartureDate    time.Time `json:"departure_date"`
+    ReturnDate       time.Time `json:"return_date"`
+    FlightClass      string    `json:"flight_class"`
+    AirlineIDs       []int     `json:"airline_ids"`
+    MaxStops         int       `json:"max_stops"`
+    Passengers       int       `json:"passengers"`
+    Page             int       `json:"page"`
+    Limit            int       `json:"limit"`
+    SortBy           string    `json:"sort_by"`
+    SortOrder        string    `json:"sort_order"`
 }

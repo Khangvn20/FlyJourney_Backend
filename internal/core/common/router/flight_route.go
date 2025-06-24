@@ -13,6 +13,7 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
         flightRoutes.GET("/airline/:airline_id", flightController.GetFlightsByAirline)
         flightRoutes.GET("/status/:status", flightController.GetFlightsByStatus)
         flightRoutes.POST("/search", flightController.SearchFlights)
+        flightRoutes.POST("/search/roundtrip", flightController.SearchRoundtripFlights)
     }
     adminRoutes :=rg.Group("/admin/flights")
     adminRoutes.Use(authMiddleware, middleware.RequireAdmin())

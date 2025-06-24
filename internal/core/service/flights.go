@@ -265,13 +265,10 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
     if req.SortOrder != "" {
         sortOrder = req.SortOrder
     }
-    
-    // Call repository with all required parameters
     flights, err := s.flightRepo.SearchFlights(
         req.DepartureAirport,
         req.ArrivalAirport,
         req.DepartureDate,
-        req.ArrivalDate,
         req.FlightClass,
         airlineIDs,
         maxStops,
@@ -378,5 +375,107 @@ func (s *flightService) GetFlightsByStatus(status string, page, limit int) *resp
         ErrorCode:    error_code.Success,
         ErrorMessage: "Successfully retrieved flights by status",
         Data:         flights,
+    }
+}
+func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearchRequest) *response.Response {
+    var airlineIDs []int
+    if req.AirlineIDs != nil {
+        airlineIDs = req.AirlineIDs
+    }
+    maxStops := -1
+    if req.MaxStops >= 0 {
+        maxStops = req.MaxStops
+    }
+    page :=1
+    if req.Page > 0 {
+        page = req.Page
+        
+    }
+    limit :=10
+    if req.Limit > 0 {
+        limit = req.Limit
+    }
+    sortBy := "departure_time"
+    if req.SortBy != "" {
+        sortBy = req.SortBy
+    }
+    sortOrder := "ASC"
+    if req.SortOrder != "" {
+        sortOrder = req.SortOrder
+    }
+    outboundFlights, err := s.flightRepo.SearchFlights(
+        req.DepartureAirport,
+        req.ArrivalAirport,
+        req.DepartureDate,
+        req.FlightClass,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+    )
+    if err != nil {
+        log.Printf("Error searching outbound flights: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    inboundFlights, err := s.flightRepo.SearchFlights(
+        req.ArrivalAirport,
+        req.DepartureAirport,
+        req.ReturnDate,
+        req.FlightClass,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+    )
+    if err !=nil {
+        log.Printf("Error searching inbound flights: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    outboundCount, err := s.flightRepo.CountBySearch(
+        req.DepartureAirport,
+        req.ArrivalAirport,
+        req.DepartureDate,
+    )
+    inboundCount, err := s.flightRepo.CountBySearch(
+        req.ArrivalAirport,
+        req.DepartureAirport,
+        req.ReturnDate,
+    )
+    ountboundTotalPages := (outboundCount + limit - 1) / limit
+    inboundTotalPages := (inboundCount + limit - 1) / limit
+    return &response.Response{
+        Status:       true,
+        ErrorCode:   error_code.Success,
+        ErrorMessage: "Successfully searched roundtrip flights",
+        Data: map[string]interface{}{
+            "outbound_flights": outboundFlights,
+            "inbound_flights":  inboundFlights,
+            "outbound_total_count": outboundCount,
+            "inbound_total_count":  inboundCount,
+            "outbound_total_pages": ountboundTotalPages,
+            "inbound_total_pages":  inboundTotalPages,
+            "page":              page,
+            "limit":             limit,
+            "departure_airport": req.DepartureAirport,
+            "arrival_airport":   req.ArrivalAirport,
+            "departure_date":    req.DepartureDate,
+            "return_date":       req.ReturnDate,
+            "flight_class":      req.FlightClass,
+            "passenger_count":   req.Passengers,
+            "sort_by":           sortBy,
+            "sort_order":        sortOrder,
+        },
     }
 }
