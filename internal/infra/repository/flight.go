@@ -68,14 +68,14 @@ func (r *flightRepository) CreateFlightClasses(flightID int, classes []*dto.Flig
     totalSeats := 0
    for _, fc := range classes {
         query := `
-            INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats, package_available)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING flight_class_id
         `
         
         var flightClassID int
         err := tx.QueryRow(ctx, query,
-            flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats).Scan(&flightClassID)
+            flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats, fc.PackageAvailable).Scan(&flightClassID)
              
         if err != nil {
             log.Printf("Error creating flight class: %v", err)
@@ -87,7 +87,7 @@ func (r *flightRepository) CreateFlightClasses(flightID int, classes []*dto.Flig
         createdClasses = append(createdClasses, fc)
         totalSeats += fc.TotalSeats
     }
-     updateQuery := `
+    updateQuery := `
         UPDATE flights 
         SET total_seats = $1 
         WHERE flight_id = $2
@@ -375,8 +375,8 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
         }
         return nil, nil, fmt.Errorf("error getting flight by ID: %w", err)
     }
-   flightClassesQuery := `
-        SELECT flight_class_id, flight_id, class, base_price, available_seats, total_seats
+    flightClassesQuery := `
+        SELECT flight_class_id, flight_id, class, base_price, available_seats, total_seats, package_available
         FROM flight_classes
         WHERE flight_id = $1
         ORDER BY base_price ASC
@@ -399,6 +399,7 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
             &fc.BasePrice,
             &fc.AvailableSeats,
             &fc.TotalSeats,
+            &fc.PackageAvailable,
         ); err != nil {
             return &flight, nil, fmt.Errorf("error scanning flight class: %w", err)
         }
@@ -565,7 +566,7 @@ func (r *flightRepository) SearchFlights(
                f.duration_minutes, f.stops_count, f.tax_and_fees, 
                f.status, f.gate, f.terminal, f.distance, 
                fc.class as flight_class, fc.base_price as class_price,
-               fc.available_seats as class_availability, f.total_seats
+               fc.available_seats as class_availability, f.total_seats, fc.package_available
         FROM flights f
         JOIN flight_classes fc ON f.flight_id = fc.flight_id
         JOIN airlines a ON f.airline_id = a.airline_id
@@ -629,6 +630,7 @@ func (r *flightRepository) SearchFlights(
             &result.ClassPrice,
             &result.ClassAvailability,
             &totalSeats,
+            &result.PackageAvailable,
         )
         
         if err != nil {

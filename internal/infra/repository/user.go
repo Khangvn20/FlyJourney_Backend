@@ -6,7 +6,6 @@ import (
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
 	coreRepo "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/repository"
 	"github.com/jackc/pgx/v5"
-	"github.com/lib/pq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"time"
@@ -28,7 +27,7 @@ func (r *userRepository) FindByEmail(email string) (*dto.User, error) {
             email, 
             password, 
             name, 
-            roles,  -- Bỏ type casting
+            roles,  
             created_at, 
             updated_at, 
             last_login 
@@ -123,7 +122,7 @@ func (r *userRepository) GetUserByID(userID int) (*dto.User, error) {
 	defer cancel()
 
 	query := `
-		SELECT user_id, email, name, phone, role, created_at, updated_at, last_login 
+		SELECT user_id, email, name, phone, roles, created_at, updated_at, last_login 
 		FROM users 
 		WHERE user_id = $1 
 		LIMIT 1
@@ -131,12 +130,14 @@ func (r *userRepository) GetUserByID(userID int) (*dto.User, error) {
 
 	var user dto.User
 	var lastLogin *time.Time
+    var roles string 
+
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&user.UserID,
 		&user.Email,
 		&user.Name,
 		&user.Phone,
-		pq.Array(&user.Roles),
+		&roles,  
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&lastLogin,

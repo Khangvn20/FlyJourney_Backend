@@ -2,13 +2,12 @@ package service
 
 import (
     "time"
-    "github.com/golang-jwt/jwt/v5"
     "context"
 )
 
 type TokenService interface {
     GenerateToken(userID int, role string, duration time.Duration) (string, error)
-    ValidateToken(tokenString string) (jwt.MapClaims, error)
+    ValidateToken(tokenString string) (int, string, error)
     DeleteToken(tokenString string) error
 }
 type RevokedTokenRepository interface {

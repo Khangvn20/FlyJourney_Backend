@@ -5,17 +5,19 @@ import (
     "encoding/json"
     "github.com/redis/go-redis/v9"
     "time"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
 )
 
 type redisService struct {
     client *redis.Client
 }
 
-func NewRedisService(client *redis.Client) *redisService {
+func NewRedisService(client *redis.Client) service.RedisService {
     return &redisService{
         client: client,
     }
 }
+
 
 func (s *redisService) Set(key string, value interface{}, expiration time.Duration) error {
     ctx := context.Background()

@@ -114,7 +114,7 @@ func (s *userService) Login(req *request.LoginRequest) *response.Response {
     }
 
     tokenDuration := time.Hour * 24
-    token, err := s.tokenService.GenerateToken(user.UserID, string(user.Roles), tokenDuration)
+     token, err := s.tokenService.GenerateToken(user.UserID, string(user.Roles), tokenDuration)
     if err != nil {
         return &response.Response{
             Status:       false,

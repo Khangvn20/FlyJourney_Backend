@@ -5,6 +5,8 @@ import (
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
 	"github.com/gin-gonic/gin"
 	"log"
+	"net/http"
+	"strings"
 )
 
 type UserController struct {
@@ -96,22 +98,30 @@ func (c *UserController) ConfirmResetPassword(ctx *gin.Context) {
 	ctx.JSON(200, result)
 }
 func (c *UserController) Logout(ctx *gin.Context) {
-    tokenString := ctx.GetHeader("Authorization")
-    if tokenString == "" {
-        ctx.JSON(400, gin.H{
+
+
+    authHeader := ctx.GetHeader("Authorization")
+    if authHeader == "" {
+        ctx.JSON(http.StatusBadRequest, gin.H{
             "status":       false,
-            "errorCode":    "INVALID_REQUEST",
+            "errorCode":    "MISSING_TOKEN",
             "errorMessage": "Authorization header is required",
-            "data":         nil,
         })
         return
     }
+    tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+    if tokenString == "" {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_TOKEN",
+            "errorMessage": "Invalid token format",
+        })
+        return
+    }  
     result := c.userService.Logout(tokenString)
-    var statusCode int
-    if result.Status {
-        statusCode = 200
-    } else {
-        statusCode = 400
+    statusCode := http.StatusOK
+    if !result.Status {
+        statusCode = http.StatusInternalServerError
     }
     ctx.JSON(statusCode, result)
 }

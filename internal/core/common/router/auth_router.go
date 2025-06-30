@@ -12,6 +12,6 @@ func AuthRoutes(rg *gin.RouterGroup, userController *controller.UserController,a
 		authRoutes.POST("/confirm-register", userController.ConfirmRegister)
 		authRoutes.POST("/confirm-reset-password", userController.ConfirmResetPassword)
 		authRoutes.POST("/reset-password", userController.ResetPassword)
-		authRoutes.POST("/logout", userController.Logout)
-	}
+		authRoutes.POST("/logout", authMiddleware, userController.Logout)
+ 	}
 }

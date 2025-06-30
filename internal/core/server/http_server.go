@@ -54,7 +54,6 @@ func NewHTTPServer(port int) (*Server, error) {
     if err != nil {
         return nil, fmt.Errorf("failed to connect to Redis: %v", err)
     }
-    defer redisClient.Close()
    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
     
@@ -68,13 +67,16 @@ func NewHTTPServer(port int) (*Server, error) {
     if err := db.Ping(ctx); err != nil {
         return nil, fmt.Errorf("database ping failed: %v", err)
     }
-   
+   //Intitiallize config
+
     // Initialize repository
     userRepo := repository.NewUserRepository(db)
     flightRepo := repository.NewFlightRepository(db.GetPool())
     // Initialize services
+    redisService := service.NewRedisService(redisClient)
+    
     emailOTPService := service.NewEmailOTPService()
-    tokenService := utils.NewTokenService()
+     tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
     flightService := service.NewFlightService(flightRepo)
 

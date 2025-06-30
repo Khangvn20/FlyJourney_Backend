@@ -28,6 +28,7 @@ type FlightClass struct {
     Class          string    `json:"class"` 
     BasePrice      float64   `json:"base_price"`
     AvailableSeats int       `json:"available_seats"`
+    PackageAvailable string  `json:"package_available,omitempty"`
     TotalSeats     int       `json:"total_seats"`
     CreatedAt      time.Time `json:"created_at,omitempty"`
     UpdatedAt      time.Time `json:"updated_at,omitempty"`
@@ -55,6 +56,7 @@ type FlightSearchResult struct {
     Distance          int       `json:"distance,omitempty"`
     ClassPrice        float64   `json:"class_price"`
     ClassAvailability int       `json:"class_availability"`
+    PackageAvailable  string    `json:"package_available,omitempty"`
 }
 type RoundtripSearchResult struct {
     OutboundFlights []*FlightSearchResult `json:"outbound_flights"`
