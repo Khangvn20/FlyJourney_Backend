@@ -9,6 +9,7 @@ type LoginRequest struct {
 	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
+
 type ConfirmRegisterRequest struct {
     Email    string `json:"email" binding:"required,email"`
     OTP      string `json:"otp" binding:"required"`
@@ -22,4 +23,9 @@ type ConfirmResetPasswordRequest struct {
 }
 type ResetPasswordRequest struct {
 	Email string `json:"email" binding:"required,email"`
+}
+type UpdateProfileRequest struct {
+    Name  string `json:"name" `
+    Phone string `json:"phone" `
+	Email string `json:"email"`
 }

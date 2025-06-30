@@ -13,4 +13,5 @@ type UserService interface {
 	ResetPassword(request *request.ResetPasswordRequest) *response.Response
 	Logout(token string) *response.Response
 	GetUserInfo(userID int) *response.Response
+	UpdateProfile(userID int, request *request.UpdateProfileRequest) *response.Response
 }

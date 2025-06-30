@@ -8,6 +8,7 @@ const (
 	InvalidRequest ErrorCode = "INVALID_REQUEST"
 	DuplicateUser  ErrorCode = "DUPLICATE_USER"
 	InternalError  ErrorCode = "INTERNAL_ERROR"
+	Forbidden      ErrorCode = "FORBIDDEN"
 )
 
 // error message
