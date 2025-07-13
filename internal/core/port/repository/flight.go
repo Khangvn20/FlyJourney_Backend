@@ -26,6 +26,7 @@ type FlightRepository interface {
         limit int,
         sortBy string,
         sortOrder string,
+        forUser bool,
     ) ([]*dto.FlightSearchResult, error)
      SearchRoundtripFlights(
         departureAirport string,
@@ -42,7 +43,7 @@ type FlightRepository interface {
     ) (*dto.RoundtripSearchResult, error)
 		//Metadata methods
 		 Count() (int, error)
-    CountBySearch(departureAirport, arrivalAirport string, departureDate time.Time) (int, error)
+    CountBySearch(departureAirport, arrivalAirport string, departureDate time.Time,forUser bool, ) (int, error)
     // Status updates
     UpdateStatus(id int, status string) error
 

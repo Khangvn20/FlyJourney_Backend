@@ -14,5 +14,8 @@ type FlightService interface {
 	GetFlightByAirline(airlineID int, page, limit int) *response.Response
 	GetFlightsByStatus(status string, page, limit int) *response.Response
 	SearchRoundtripFlights(req *request.RoundtripFlightSearchRequest) *response.Response
-	//UpdateFlightClass(flightID int, request *request.UpdateFlightClassRequest) *response.Response
+	 GetFlightByIDForUser(flightID int) *response.Response 
+    GetFlightByIDForAdmin(flightID int) *response.Response
+	SearchFlightsForUser(req *request.FlightSearchRequest) *response.Response
+	SearchRoundtripFlightsForUser(req *request.RoundtripFlightSearchRequest) *response.Response
 }

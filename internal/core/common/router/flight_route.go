@@ -9,11 +9,11 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
     flightRoutes := rg.Group("/flights")
     {
 		flightRoutes.GET("/", flightController.GetAllFlights)
-        flightRoutes.GET("/:id", flightController.GetFlightByID)
+        flightRoutes.GET("/:id", flightController.GetFlightByIDForUser)
         flightRoutes.GET("/airline/:airline_id", flightController.GetFlightsByAirline)
         flightRoutes.GET("/status/:status", flightController.GetFlightsByStatus)
-        flightRoutes.POST("/search", flightController.SearchFlights)
-        flightRoutes.POST("/search/roundtrip", flightController.SearchRoundtripFlights)
+        flightRoutes.POST("/search", flightController.SearchFlightsForUser)
+         flightRoutes.POST("/search/roundtrip", flightController.SearchRoundtripFlightsForUser)
     }
     adminRoutes :=rg.Group("/admin/flights")
     adminRoutes.Use(authMiddleware, middleware.RequireAdmin())
@@ -21,6 +21,9 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
         adminRoutes.POST("/", flightController.CreateFlight)
         adminRoutes.PUT("/:id", flightController.UpdateFlight)
         adminRoutes.PATCH("/:id", flightController.UpdateFlightStatus)
+        adminRoutes.GET("/:id", flightController.GetFlightByID)
+        adminRoutes.POST("/search", flightController.SearchFlights)
+        adminRoutes.POST("/search/roundtrip", flightController.SearchRoundtripFlights)
     }
 	}
 	

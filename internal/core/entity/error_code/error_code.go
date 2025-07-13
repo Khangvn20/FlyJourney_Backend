@@ -9,6 +9,7 @@ const (
 	DuplicateUser  ErrorCode = "DUPLICATE_USER"
 	InternalError  ErrorCode = "INTERNAL_ERROR"
 	Forbidden      ErrorCode = "FORBIDDEN"
+	InvalidID      ErrorCode = "INVALID_ID"
 )
 
 // error message

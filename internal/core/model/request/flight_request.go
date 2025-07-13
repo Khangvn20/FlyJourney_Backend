@@ -1,7 +1,27 @@
 package request
 import (
 	"time"
+    "encoding/json"
+    "fmt"
 )
+type CustomTime struct {
+    time.Time
+}
+func (ct *CustomTime) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return fmt.Errorf("invalid time format: %v", err)
+	}
+	t, err := time.Parse("02-01-2006 15:04", str)
+	if err != nil {
+		return fmt.Errorf("invalid time format: %v", err)
+	}
+	ct.Time = t
+	return nil
+}
+func (ct CustomTime) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ct.Time.Format("02-01-2006 15:04"))
+}
 type CreateFlightRequest struct {AirlineID        int       `json:"airline_id" binding:"required"`
     AircraftID       int       `json:"aircraft_id" binding:"required"`
     FlightNumber     string    `json:"flight_number" binding:"required"`
@@ -23,6 +43,7 @@ type FlightClassRequest struct {
     BasePrice      float64 `json:"base_price" binding:"required"`
     AvailableSeats int     `json:"available_seats" binding:"required"`
     TotalSeats     int     `json:"total_seats" binding:"required"`
+    PackageAvailable string  `json:"package_available"`
 }
 type UpdateFlightRequest struct {
     AirlineID       int       `json:"airline_id" validate:"required"`
@@ -46,8 +67,8 @@ type UpdateFlightStatusRequest struct {
 type FlightSearchRequest struct {
     DepartureAirport string     `json:"departure_airport" binding:"required"`
     ArrivalAirport   string     `json:"arrival_airport" binding:"required"`
-    DepartureDate    time.Time  `json:"departure_date" binding:"required"`
-    ArrivalDate      *time.Time `json:"arrival_date" binding:"omitempty"` // Sửa từ required thành omitempty
+    DepartureDate   CustomTime `json:"departure_date" binding:"required"`
+    ArrivalDate     CustomTime `json:"arrival_date" binding:"omitempty"`
     FlightClass      string     `json:"flight_class" binding:"required"`
     AirlineIDs       []int      `json:"airline_ids"`
     MaxStops         int        `json:"max_stops"`
@@ -72,8 +93,8 @@ type UpdateFlightClassRequest struct {
 type RoundtripFlightSearchRequest struct {
     DepartureAirport string     `json:"departure_airport" binding:"required"`
     ArrivalAirport   string     `json:"arrival_airport" binding:"required"`
-    DepartureDate    time.Time `json:"departure_date" binding:"required" time_format:"2006-01-02"`
-    ReturnDate       time.Time `json:"return_date" binding:"required" time_format:"2006-01-02"`
+    DepartureDate    CustomTime `json:"departure_date" binding:"required"`
+    ReturnDate       CustomTime `json:"return_date" binding:"required"`
     FlightClass      string     `json:"flight_class" binding:"required"`
     AirlineIDs       []int      `json:"airline_ids"`
     MaxStops         int        `json:"max_stops"`

@@ -67,6 +67,7 @@ func (r *flightRepository) CreateFlightClasses(flightID int, classes []*dto.Flig
     createdClasses := make([]*dto.FlightClass, 0, len(classes))
     totalSeats := 0
    for _, fc := range classes {
+    log.Printf("PackageAvailable: '%s' (length: %d)", fc.PackageAvailable, len(fc.PackageAvailable))
         query := `
             INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats, package_available)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -547,6 +548,7 @@ func (r *flightRepository) SearchFlights(
     limit int,
     sortBy string,
     sortOrder string,
+    forUser bool,
 ) ([]*dto.FlightSearchResult, error) {  
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
@@ -574,12 +576,23 @@ func (r *flightRepository) SearchFlights(
         AND f.arrival_airport = $2 
         AND f.departure_time::date = $3::date
     `
-    baseQuery += fmt.Sprintf(" AND fc.class = $%d", argIndex)
+    if  forUser {
+        baseQuery += " AND f.status = 'scheduled'"
+    
+    }else {
+        baseQuery += " AND f.status IN ('scheduled', 'delayed', 'cancelled')"
+    }
+      baseQuery += fmt.Sprintf(" AND fc.class = $%d", argIndex)
     args = append(args, class)
     argIndex++
     if len(airlineIDs) > 0 {
         baseQuery += fmt.Sprintf(" AND f.airline_id = ANY($%d::int[])", argIndex)
         args = append(args, pq.Array(airlineIDs))
+        argIndex++
+    }
+     if maxStops >= 0 {
+        baseQuery += fmt.Sprintf(" AND f.stops_count <= $%d", argIndex)
+        args = append(args, maxStops)
         argIndex++
     }
 
@@ -669,17 +682,19 @@ func (r *flightRepository) Count() (int, error) {
     return count, nil
 }
 
-func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string, departureDate time.Time) (int, error) {
+func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string, departureDate time.Time, forUser bool,) (int, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
      query := `
         SELECT COUNT(*) 
-        FROM flights
-        WHERE departure_airport = $1 AND arrival_airport = $2
-          AND departure_time::date = $3::date
+        FROM flights f
+        WHERE f.departure_airport = $1 AND f.arrival_airport = $2
+          AND f.departure_time::date = $3::date
     `
-
+     if forUser {
+        query += " AND f.status = 'scheduled'"
+    }
     var count int
     err := r.db.QueryRow(ctx, query, departureAirport, arrivalAirport, departureDate).Scan(&count)
     if err != nil {
@@ -738,6 +753,7 @@ func (r *flightRepository) SearchRoundtripFlights(
         limit,
         sortBy,
         sortOrder,
+        false,
     )
         if err != nil {
             log.Printf("Lỗi khi tìm kiếm chuyến bay đi: %v", err)
@@ -754,6 +770,7 @@ func (r *flightRepository) SearchRoundtripFlights(
         limit,
         sortBy,
         sortOrder,
+        false,
         )
         if err != nil {
             log.Printf("Lỗi khi tìm kiếm chuyến bay về: %v", err)

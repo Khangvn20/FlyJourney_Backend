@@ -1,10 +1,13 @@
 package controller
+
 import (
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
-    "github.com/gin-gonic/gin"
-    "net/http"
-    "strconv"
+	"net/http"
+	"strconv"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
+	"github.com/gin-gonic/gin"
 )
 type FlightController struct {
 	flightService service.FlightService
@@ -45,16 +48,27 @@ func (c *FlightController) GetFlightByID(ctx *gin.Context) {
         })
         return
     }
-
-    result := c.flightService.GetFlightByID(id)
+      userRole, roleExists := ctx.Get("userRole")
+     var result *response.Response
+    
+      if roleExists && userRole == "{admin}" {
+        result = c.flightService.GetFlightByIDForAdmin(id)
+    } else {
+        result = c.flightService.GetFlightByIDForUser(id)
+    }
     
     statusCode := http.StatusOK
     if !result.Status {
-        statusCode = http.StatusNotFound
+        if result.ErrorCode == error_code.InternalError {
+            statusCode = http.StatusNotFound
+        } else {
+            statusCode = http.StatusInternalServerError
+        }
     }
     
     ctx.JSON(statusCode, result)
 }
+
 func (c *FlightController) GetAllFlights(ctx *gin.Context) {
     pageStr := ctx.DefaultQuery("page", "1")
     limitStr := ctx.DefaultQuery("limit", "10")
@@ -214,5 +228,55 @@ func (c *FlightController) SearchRoundtripFlights(ctx *gin.Context) {
     }
     
     result := c.flightService.SearchRoundtripFlights(&req)
+    ctx.JSON(http.StatusOK, result)
+}
+func (c *FlightController) GetFlightByIDForUser(ctx *gin.Context) {
+    idStr := ctx.Param("id")
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_ID",
+            "errorMessage": "Invalid flight ID format",
+        })
+        return
+    }
+    result := c.flightService.GetFlightByIDForUser(id)
+    statusCode := http.StatusOK
+    if !result.Status {
+        statusCode = http.StatusBadRequest
+        if result.ErrorCode == "NOT_FOUND" {
+            statusCode = http.StatusNotFound
+        }
+    }
+    
+    ctx.JSON(statusCode, result)
+}
+func (c *FlightController) SearchFlightsForUser(ctx *gin.Context) {
+    var req request.FlightSearchRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+        })
+        return
+    }
+    
+    result := c.flightService.SearchFlightsForUser(&req)
+    ctx.JSON(http.StatusOK, result)
+}
+func (c *FlightController) SearchRoundtripFlightsForUser(ctx *gin.Context) {
+    var req request.RoundtripFlightSearchRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+        })
+        return
+    }
+    
+    result := c.flightService.SearchRoundtripFlightsForUser(&req)
     ctx.JSON(http.StatusOK, result)
 }

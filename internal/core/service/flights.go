@@ -89,6 +89,7 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
             BasePrice:      fcReq.BasePrice,
             AvailableSeats: fcReq.AvailableSeats,
             TotalSeats:     fcReq.TotalSeats,
+            PackageAvailable: fcReq.PackageAvailable,
         })
     }
     createdClasses, err := s.flightRepo.CreateFlightClasses(createdFlight.FlightID, flightClasses)
@@ -232,13 +233,12 @@ func (s *flightService) GetAllFlights(page , limit int) *response.Response {
 	}
 }
 func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *response.Response {
-    // Initialize default values for optional parameters
+   
     var airlineIDs []int
     if req.AirlineIDs != nil {
         airlineIDs = req.AirlineIDs
     }
-    
-    // Default stops value if not specified
+
     maxStops := -1
     if req.MaxStops >= 0 {
         maxStops = req.MaxStops
@@ -268,7 +268,7 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
     flights, err := s.flightRepo.SearchFlights(
         req.DepartureAirport,
         req.ArrivalAirport,
-        req.DepartureDate,
+        req.DepartureDate.Time,
         req.FlightClass,
         airlineIDs,
         maxStops,
@@ -276,6 +276,7 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
         limit,
         sortBy,
         sortOrder,
+        false,
     )
     
     if err != nil {
@@ -290,7 +291,8 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
     totalCount, err := s.flightRepo.CountBySearch(
         req.DepartureAirport,
         req.ArrivalAirport,
-        req.DepartureDate,
+        req.DepartureDate.Time,
+        false, // For admin search, we don't filter by status
     )
     
     if err != nil {
@@ -386,10 +388,325 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
     if req.MaxStops >= 0 {
         maxStops = req.MaxStops
     }
+    page := 1
+    if req.Page > 0 {
+        page = req.Page
+    }
+    limit := 10
+    if req.Limit > 0 {
+        limit = req.Limit
+    }
+    sortBy := "departure_time"
+    if req.SortBy != "" {
+        sortBy = req.SortBy
+    }
+    sortOrder := "ASC"
+    if req.SortOrder != "" {
+        sortOrder = req.SortOrder
+    }
+
+    // Tìm chuyến bay chiều đi
+    outboundFlights, err := s.flightRepo.SearchFlights(
+        req.DepartureAirport,
+        req.ArrivalAirport,
+        req.DepartureDate.Time,
+        req.FlightClass,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        false, // Admin: lấy tất cả status
+    )
+    if err != nil {
+        log.Printf("Error searching outbound flights: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+
+    // Tìm chuyến bay chiều về
+    inboundFlights, err := s.flightRepo.SearchFlights(
+        req.ArrivalAirport,
+        req.DepartureAirport,
+       req.DepartureDate.Time,
+        req.FlightClass,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        false, // Admin: lấy tất cả status
+    )
+    if err != nil {
+        log.Printf("Error searching inbound flights: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+
+    // Đếm tổng số chuyến bay chiều đi
+    outboundCount, err := s.flightRepo.CountBySearch(
+        req.DepartureAirport,
+        req.ArrivalAirport,
+        req.DepartureDate.Time,
+        false, // Admin: lấy tất cả status
+    )
+    if err != nil {
+        outboundCount = len(outboundFlights)
+    }
+
+    // Đếm tổng số chuyến bay chiều về
+    inboundCount, err := s.flightRepo.CountBySearch(
+        req.ArrivalAirport,
+        req.DepartureAirport,
+        req.DepartureDate.Time,
+        false, // Admin: lấy tất cả status
+    )
+    if err != nil {
+        inboundCount = len(inboundFlights)
+    }
+
+    outboundTotalPages := (outboundCount + limit - 1) / limit
+    inboundTotalPages := (inboundCount + limit - 1) / limit
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully searched roundtrip flights",
+        Data: map[string]interface{}{
+            "outbound_flights":      outboundFlights,
+            "inbound_flights":       inboundFlights,
+            "outbound_total_count":  outboundCount,
+            "inbound_total_count":   inboundCount,
+            "outbound_total_pages":  outboundTotalPages,
+            "inbound_total_pages":   inboundTotalPages,
+            "page":                  page,
+            "limit":                 limit,
+            "departure_airport":     req.DepartureAirport,
+            "arrival_airport":       req.ArrivalAirport,
+            "departure_date":        req.DepartureDate,
+            "return_date":           req.ReturnDate,
+            "flight_class":          req.FlightClass,
+            "passenger_count":       req.Passengers,
+            "sort_by":               sortBy,
+            "sort_order":            sortOrder,
+        },
+    }
+}
+func (s *flightService) GetFlightByIDForUser(flightID int) *response.Response {
+    flight, flightClasses, err := s.flightRepo.GetByID(flightID)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError, 
+            ErrorMessage: "Fail to get info for user",
+            Data:         nil,
+        }
+    }
+    if flight == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Flight not found",
+            Data:         nil,
+        }
+    }
+    if flight.Status != "scheduled" && flight.Status != "boarding" {
+        return &response.Response{  
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Flight is not available for booking",
+        }
+    }
+    userFlight := &dto.UserFlightDetail{
+        FlightID:         flight.FlightID,
+        AirlineID:        flight.AirlineID,
+        FlightNumber:     flight.FlightNumber,
+        DepartureAirport: flight.DepartureAirport,
+        ArrivalAirport:   flight.ArrivalAirport,
+        DepartureTime:    flight.DepartureTime,
+        ArrivalTime:      flight.ArrivalTime,
+        DurationMinutes:  flight.DurationMinutes,
+        StopsCount:       flight.StopsCount,
+        TaxAndFees:       flight.TaxAndFees,
+        Gate:             flight.Gate,
+        Terminal:         flight.Terminal,
+        Distance:         flight.Distance,
+        FlightClasses:    make([]*dto.UserFlightClass, 0, len(flightClasses)),
+    }
+
+        for _, fc := range flightClasses {
+        userFlightClass := &dto.UserFlightClass{
+            FlightClassID:    fc.FlightClassID,
+            Class:            fc.Class,
+            BasePrice:        fc.BasePrice,
+            AvailableSeats:   fc.AvailableSeats,
+            PackageAvailable: fc.PackageAvailable,
+        }
+        userFlight.FlightClasses = append(userFlight.FlightClasses, userFlightClass)
+    }
+    return &response.Response{
+        Status:      true,
+        ErrorCode:  error_code.Success,
+        ErrorMessage: "Successfully retrieved flight details for user",
+         Data:         userFlight,
+    }
+}
+func (s *flightService) GetFlightByIDForAdmin(flightID int) *response.Response {
+    flight, flightClasses, err := s.flightRepo.GetByID(flightID)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Fail to get info for admin",
+            Data:         nil,
+        }
+    }
+    if flight == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Flight not found",
+            Data:         nil,
+        }
+    }
+    adminFlight := &dto.AdminFlightDetail{
+        FlightID:         flight.FlightID,
+        AirlineID:        flight.AirlineID,
+        AircraftID:       flight.AircraftID,
+        FlightNumber:     flight.FlightNumber,
+        DepartureAirport: flight.DepartureAirport,
+        ArrivalAirport:   flight.ArrivalAirport,
+        DepartureTime:    flight.DepartureTime,
+        ArrivalTime:      flight.ArrivalTime,
+        DurationMinutes:  flight.DurationMinutes,
+        StopsCount:       flight.StopsCount,
+        TaxAndFees:       flight.TaxAndFees,
+        TotalSeats:       flight.TotalSeats,
+        Status:           flight.Status,
+        Gate:             flight.Gate,
+        Terminal:         flight.Terminal,
+        Distance:         flight.Distance,
+        CreatedAt:        flight.CreatedAt,
+        UpdatedAt:        flight.UpdatedAt,
+        FlightClasses:    make([]*dto.AdminFlightClass, 0, len(flightClasses)),
+    }
+    for _, fc := range flightClasses {
+        adminFlightClass := &dto.AdminFlightClass{
+            FlightClassID:    fc.FlightClassID,
+            FlightID:         fc.FlightID,
+            Class:            fc.Class,
+            BasePrice:        fc.BasePrice,
+            AvailableSeats:   fc.AvailableSeats,
+            TotalSeats:       fc.TotalSeats,
+            PackageAvailable: fc.PackageAvailable,
+            CreatedAt:        fc.CreatedAt,
+            UpdatedAt:        fc.UpdatedAt,
+        }
+        adminFlight.FlightClasses = append(adminFlight.FlightClasses, adminFlightClass)
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully retrieved flight details",
+        Data:         adminFlight,
+    }
+}
+func (s *flightService) SearchFlightsForUser(req *request.FlightSearchRequest) *response.Response {
+    var airlineIDs []int
+    if req.AirlineIDs != nil {
+        airlineIDs = req.AirlineIDs
+    }
+    maxStops := -1
+    if req.MaxStops >= 0 {
+        maxStops = req.MaxStops
+    }
     page :=1
     if req.Page > 0 {
         page = req.Page
-        
+    }
+    limit :=10
+    if req.Limit > 0 {
+        limit = req.Limit
+    }
+    sortBy := "departure_time"
+    if req.SortBy != "" {
+        sortBy = req.SortBy
+    }
+    sortOrder := "ASC"
+    if req.SortOrder != "" {
+        sortOrder = req.SortOrder
+    }
+    flights, err := s.flightRepo.SearchFlights(
+        req.DepartureAirport,
+        req.ArrivalAirport,
+        req.DepartureDate.Time,
+        req.FlightClass,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        true,
+    )
+    if err != nil {
+        log.Printf("Error searching flights: %v", err)
+        return &response.Response{
+            Status:      false,
+            ErrorCode:   error_code.InternalError,
+            ErrorMessage: "Error searching flights",
+        }
+    }
+    totalCount, err := s.flightRepo.CountBySearch(
+        req.DepartureAirport,
+        req.ArrivalAirport,
+        req.DepartureDate.Time,
+        true,
+    )
+    if err != nil {
+        log.Printf("Error counting flights: %v", err)
+        totalCount = len(flights)
+    }
+    totalCountPages := (totalCount + limit - 1) / limit
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully searched flights for user",
+        Data: map[string]interface{}{
+            "flights":           flights,
+            "total_count":       totalCount,
+            "total_pages":       totalCountPages,
+            "page":              page,
+            "limit":             limit,
+            "departure_airport": req.DepartureAirport,
+            "arrival_airport":   req.ArrivalAirport,
+            "departure_date":    req.DepartureDate,
+            "flight_class":      req.FlightClass,
+            "sort_by":           sortBy,
+            "sort_order":        sortOrder,
+        },
+    }
+}
+func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlightSearchRequest) *response.Response {
+    var airlineIDs []int
+    if req.AirlineIDs != nil {
+        airlineIDs = req.AirlineIDs
+    }
+    maxStops := -1
+    if req.MaxStops >= 0 {
+        maxStops = req.MaxStops
+    }
+    page :=1
+    if req.Page > 0 {
+        page = req.Page
     }
     limit :=10
     if req.Limit > 0 {
@@ -406,7 +723,7 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
     outboundFlights, err := s.flightRepo.SearchFlights(
         req.DepartureAirport,
         req.ArrivalAirport,
-        req.DepartureDate,
+        req.DepartureDate.Time,
         req.FlightClass,
         airlineIDs,
         maxStops,
@@ -414,19 +731,20 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
         limit,
         sortBy,
         sortOrder,
+        true,
     )
-    if err != nil {
+    if err !=nil {
         log.Printf("Error searching outbound flights: %v", err)
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InternalError,
-            ErrorMessage: error_code.InternalErrMsg,
+            ErrorMessage: "Error searching outbound flights",
         }
     }
     inboundFlights, err := s.flightRepo.SearchFlights(
         req.ArrivalAirport,
         req.DepartureAirport,
-        req.ReturnDate,
+        req.DepartureDate.Time,
         req.FlightClass,
         airlineIDs,
         maxStops,
@@ -434,38 +752,47 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
         limit,
         sortBy,
         sortOrder,
+        true,
     )
-    if err !=nil {
+    if err != nil {
         log.Printf("Error searching inbound flights: %v", err)
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InternalError,
-            ErrorMessage: error_code.InternalErrMsg,
+            ErrorMessage: "Error searching inbound flights",
         }
     }
-    outboundCount, err := s.flightRepo.CountBySearch(
+    outboundFlightsCount, err := s.flightRepo.CountBySearch(
         req.DepartureAirport,
         req.ArrivalAirport,
-        req.DepartureDate,
+        req.DepartureDate.Time,
+        true,
     )
-    inboundCount, err := s.flightRepo.CountBySearch(
+    if err !=nil {
+        outboundFlightsCount = len(outboundFlights)
+    }   
+    inboundFlightsCount, err := s.flightRepo.CountBySearch(
         req.ArrivalAirport,
         req.DepartureAirport,
-        req.ReturnDate,
+        req.DepartureDate.Time,
+        true,
     )
-    ountboundTotalPages := (outboundCount + limit - 1) / limit
-    inboundTotalPages := (inboundCount + limit - 1) / limit
+    if err != nil {
+        inboundFlightsCount = len(inboundFlights)
+    }
+    outboundFlightsTotalPages := (outboundFlightsCount + limit - 1) / limit
+    inboundFlightsTotalPages := (inboundFlightsCount + limit - 1) / limit
     return &response.Response{
         Status:       true,
-        ErrorCode:   error_code.Success,
-        ErrorMessage: "Successfully searched roundtrip flights",
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully searched roundtrip flights for user",
         Data: map[string]interface{}{
             "outbound_flights": outboundFlights,
             "inbound_flights":  inboundFlights,
-            "outbound_total_count": outboundCount,
-            "inbound_total_count":  inboundCount,
-            "outbound_total_pages": ountboundTotalPages,
-            "inbound_total_pages":  inboundTotalPages,
+            "outbound_total_count": outboundFlightsCount,
+            "inbound_total_count":  inboundFlightsCount,
+            "outbound_total_pages": outboundFlightsTotalPages,
+            "inbound_total_pages":  inboundFlightsTotalPages,
             "page":              page,
             "limit":             limit,
             "departure_airport": req.DepartureAirport,
