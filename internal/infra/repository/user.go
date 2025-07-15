@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"time"
+	"fmt"
 )
 
 type userRepository struct {
@@ -20,73 +21,122 @@ func NewUserRepository(db coreRepo.Database) coreRepo.UserRepository {
 }
 
 func (r *userRepository) FindByEmail(email string) (*dto.User, error) {
+      query := `
+        SELECT 
+            user_id, 
+            email, 
+            password, 
+            name, 
+            roles,  
+            created_at, 
+            updated_at, 
+            last_login 
+        FROM users 
+        WHERE email = $1 
+        LIMIT 1
+    `
 
-	query := `
-		SELECT user_id, email, password, name, phone, role, created_at, updated_at, last_login 
-		FROM users 
-		WHERE email = $1 
-		LIMIT 1
-	`
+    var user dto.User
+    var lastLogin *time.Time
+    var roles string 
 
-	var user dto.User
-	var lastLogin *time.Time
-	err := r.db.QueryRow(context.Background(), query, email).Scan(
-		&user.UserID,
-		&user.Email,
-		&user.Password,
-		&user.Name,
-		&user.Phone,
-		&user.Role,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-		&lastLogin,
-	)
+    err := r.db.QueryRow(context.Background(), query, email).Scan(
+        &user.UserID,
+        &user.Email,
+        &user.Password,
+        &user.Name,
+        &roles,   
+        &user.CreatedAt,
+        &user.UpdatedAt,
+        &lastLogin,
+    )
 
-	if errors.Is(err, pgx.ErrNoRows) {
-		log.Printf("No user found with email: %s", email)
-		return nil, nil
-	}
+    if err == pgx.ErrNoRows {
+        return nil, nil
+    }
+    if err != nil {
+        log.Printf("Error scanning user data: %v", err)
+        return nil, fmt.Errorf("error finding user: %w", err)
+    }
 
-	if err != nil {
-		log.Printf("Error in FindByEmail: %v", err)
-		return nil, err
-	}
+    user.Roles = dto.UserRole(roles)
+    user.LastLogin = lastLogin
 
-	user.LastLogin = lastLogin
-	log.Printf("User found with email: %s", email)
-	return &user, nil
+    return &user, nil
+}
+func (r *userRepository) FindByPhone(phone string) (*dto.User, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT user_id, email, password, name, phone, roles, created_at, updated_at, last_login 
+        FROM users 
+        WHERE phone = $1 
+        LIMIT 1
+    `
+
+    var user dto.User
+    var lastLogin *time.Time
+    var roles string 
+
+    err := r.db.QueryRow(ctx, query, phone).Scan(
+        &user.UserID,
+        &user.Email,
+        &user.Password,
+        &user.Name,
+        &user.Phone,
+        &roles,
+        &user.CreatedAt,
+        &user.UpdatedAt,
+        &lastLogin,
+    )
+
+    if errors.Is(err, pgx.ErrNoRows) {
+        log.Printf("No user found with phone: %s", phone)
+        return nil, nil
+    }
+
+    if err != nil {
+        log.Printf("Error in FindByPhone: %v", err)
+        return nil, err
+    }
+
+    user.Roles = dto.UserRole(roles)
+    user.LastLogin = lastLogin
+    return &user, nil
 }
 
 func (r *userRepository) Create(user *dto.User) (*dto.User, error) {
-	// Sửa lại RETURNING để lấy chính xác user_id
-	query := `
-		INSERT INTO users (email, password, name, phone, role, created_at, updated_at) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7) 
-		RETURNING user_id
-	`
+    if user.Roles == "" {
+        user.Roles = dto.RoleUser
+    }
+      query := `
+        INSERT INTO users (email, password, name, phone, roles, created_at, updated_at) 
+        VALUES ($1, $2, $3, $4, ARRAY[$5]::user_role[], $6, $7) 
+        RETURNING user_id
+    `
 
-	// Thêm log để debug
-	log.Printf("Creating user with email: %s", user.Email)
 
-	err := r.db.QueryRow(context.Background(), query,
-		user.Email,
-		user.Password,
-		user.Name,
-		user.Phone,
-		user.Role,
-		user.CreatedAt,
-		user.UpdatedAt,
-	).Scan(&user.UserID)
+    log.Printf("Creating user with email: %s and role: %s", user.Email, user.Roles)
 
-	if err != nil {
-		log.Printf("Error creating user: %v", err)
-		return nil, err
-	}
+    err := r.db.QueryRow(context.Background(), query,
+        user.Email,
+        user.Password,
+        user.Name,
+        user.Phone,
+        string(user.Roles), 
+        user.CreatedAt,
+        user.UpdatedAt,
+    ).Scan(&user.UserID)
 
-	log.Printf("User created successfully with ID: %d", user.UserID)
-	return user, nil
+    if err != nil {
+        log.Printf("Error creating user: %v", err)
+        return nil, err
+    }
+
+    log.Printf("User created successfully with ID: %d", user.UserID)
+    return user, nil
 }
-
 func (r *userRepository) UpdateLastLogin(userID int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -114,7 +164,7 @@ func (r *userRepository) GetUserByID(userID int) (*dto.User, error) {
 	defer cancel()
 
 	query := `
-		SELECT user_id, email, name, phone, role, created_at, updated_at, last_login 
+		SELECT user_id, email, name, phone, roles, created_at, updated_at, last_login 
 		FROM users 
 		WHERE user_id = $1 
 		LIMIT 1
@@ -122,12 +172,14 @@ func (r *userRepository) GetUserByID(userID int) (*dto.User, error) {
 
 	var user dto.User
 	var lastLogin *time.Time
+    var roles string 
+
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&user.UserID,
 		&user.Email,
 		&user.Name,
 		&user.Phone,
-		&user.Role,
+		&roles,  
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&lastLogin,
@@ -145,4 +197,26 @@ func (r *userRepository) GetUserByID(userID int) (*dto.User, error) {
 
 	user.LastLogin = lastLogin
 	return &user, nil
+}
+func (r *userRepository) UpdateProfile(userID int, user *dto.User) (*dto.User, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    // Add logging
+    log.Printf("Executing DB query to update profile for user ID: %d with name: %s, phone: %s", 
+        userID, user.Name, user.Phone)
+    
+    query := `UPDATE users SET name = $1, phone = $2, updated_at = $3 WHERE user_id = $4`
+    result, err := r.db.Exec(ctx, query, user.Name, user.Phone, time.Now(), userID)
+    if err != nil {
+        log.Printf("Database error updating user profile: %v", err)
+        return nil, err
+    }
+   rowsAffected:= result.RowsAffected()
+    if rowsAffected == 0 {
+        log.Printf("No rows were updated for user ID: %d", userID)
+        return nil, fmt.Errorf("no rows updated")
+    }   
+    log.Printf("Successfully updated %d rows for user ID: %d", rowsAffected, userID)
+    return r.GetUserByID(userID)
 }
