@@ -432,7 +432,7 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
     inboundFlights, err := s.flightRepo.SearchFlights(
         req.ArrivalAirport,
         req.DepartureAirport,
-       req.DepartureDate.Time,
+       req.ReturnDate.Time,
         req.FlightClass,
         airlineIDs,
         maxStops,
@@ -466,7 +466,7 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
     inboundCount, err := s.flightRepo.CountBySearch(
         req.ArrivalAirport,
         req.DepartureAirport,
-        req.DepartureDate.Time,
+        req.ReturnDate.Time,
         false, // Admin: lấy tất cả status
     )
     if err != nil {
@@ -744,7 +744,7 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
     inboundFlights, err := s.flightRepo.SearchFlights(
         req.ArrivalAirport,
         req.DepartureAirport,
-        req.DepartureDate.Time,
+        req.ReturnDate.Time,
         req.FlightClass,
         airlineIDs,
         maxStops,

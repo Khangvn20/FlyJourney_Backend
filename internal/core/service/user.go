@@ -47,35 +47,55 @@ func handleValidationErrors(message string) *response.Response {
 }
 
 func (s *userService) Register(req *request.RegisterRequest) *response.Response {
-	// Validate email
-	if !validateEmail(req.Email) {
-		return handleValidationErrors("Email is invalid")
-	}
-	// Validate password
-	if len(req.Password) < 6 {
-		return handleValidationErrors("Password must be at least 6 characters")
-	}
-	// Validate name
-	if !validateName(req.Name) {
-		return handleValidationErrors("Name is required and must not be a number")
-	}
-	// Check if email exists
-	userExist, err := s.userRepo.FindByEmail(req.Email)
-	if err != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
-	if userExist != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.DuplicateUser,
-			ErrorMessage: "Email đã tồn tại",
-		}
-	}
-     otpResult := s.emailOTPService.SendOTPEmail(req.Email)
+    // Validate email
+    if !validateEmail(req.Email) {
+        return handleValidationErrors("Email is invalid")
+    }
+    // Validate password
+    if len(req.Password) < 6 {
+        return handleValidationErrors("Password must be at least 6 characters")
+    }
+    // Validate name
+    if !validateName(req.Name) {
+        return handleValidationErrors("Name is required and must not be a number")
+    }
+
+    // Check if email exists
+    userByEmail, err := s.userRepo.FindByEmail(req.Email)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if userByEmail != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.DuplicateUser,
+            ErrorMessage: "Email is already registered",
+        }
+    }
+
+    // Check if phone exists
+    userByPhone, err := s.userRepo.FindByPhone(req.Phone)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if userByPhone != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.DuplicateUser,
+            ErrorMessage: "Phone number is already registered",
+        }
+    }
+
+    // Send OTP
+    otpResult := s.emailOTPService.SendOTPEmail(req.Email)
     if !otpResult.Status {
         return otpResult
     }
@@ -83,9 +103,8 @@ func (s *userService) Register(req *request.RegisterRequest) *response.Response 
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
-        ErrorMessage: "Đã gửi OTP xác thực email, vui lòng kiểm tra email.",
+        ErrorMessage: "OTP already sent to email, please check your email.",
     }
-	
 }
 func (s *userService) Login(req *request.LoginRequest) *response.Response {
 	  user, err := s.userRepo.FindByEmail(req.Email)
@@ -174,6 +193,7 @@ func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *resp
         Password:  string(hashed),
         Name:      req.Name,
         Roles: dto.RoleUser, 
+        Phone:     req.Phone,
         CreatedAt: now,
         UpdatedAt: now,
     }
@@ -191,6 +211,7 @@ func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *resp
             "user_id": newUser.UserID,
             "email":   newUser.Email,
             "name":    newUser.Name,
+            "phone":   newUser.Phone,
         },
         Status:       true,
         ErrorCode:    error_code.Success,

@@ -9,4 +9,5 @@ type UserRepository interface {
 	UpdatePassword(userID int, newPassword string) error
 	GetUserByID(userID int) (*dto.User, error)
 	UpdateProfile(userID int, user *dto.User) (*dto.User, error)
+	FindByPhone(phone string) (*dto.User, error)
 }

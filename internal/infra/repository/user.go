@@ -64,14 +64,55 @@ func (r *userRepository) FindByEmail(email string) (*dto.User, error) {
 
     return &user, nil
 }
+func (r *userRepository) FindByPhone(phone string) (*dto.User, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT user_id, email, password, name, phone, roles, created_at, updated_at, last_login 
+        FROM users 
+        WHERE phone = $1 
+        LIMIT 1
+    `
+
+    var user dto.User
+    var lastLogin *time.Time
+    var roles string 
+
+    err := r.db.QueryRow(ctx, query, phone).Scan(
+        &user.UserID,
+        &user.Email,
+        &user.Password,
+        &user.Name,
+        &user.Phone,
+        &roles,
+        &user.CreatedAt,
+        &user.UpdatedAt,
+        &lastLogin,
+    )
+
+    if errors.Is(err, pgx.ErrNoRows) {
+        log.Printf("No user found with phone: %s", phone)
+        return nil, nil
+    }
+
+    if err != nil {
+        log.Printf("Error in FindByPhone: %v", err)
+        return nil, err
+    }
+
+    user.Roles = dto.UserRole(roles)
+    user.LastLogin = lastLogin
+    return &user, nil
+}
 
 func (r *userRepository) Create(user *dto.User) (*dto.User, error) {
     if user.Roles == "" {
         user.Roles = dto.RoleUser
     }
       query := `
-        INSERT INTO users (email, password, name, roles, created_at, updated_at) 
-        VALUES ($1, $2, $3, ARRAY[$4]::user_role[], $5, $6) 
+        INSERT INTO users (email, password, name, phone, roles, created_at, updated_at) 
+        VALUES ($1, $2, $3, $4, ARRAY[$5]::user_role[], $6, $7) 
         RETURNING user_id
     `
 
@@ -82,6 +123,7 @@ func (r *userRepository) Create(user *dto.User) (*dto.User, error) {
         user.Email,
         user.Password,
         user.Name,
+        user.Phone,
         string(user.Roles), 
         user.CreatedAt,
         user.UpdatedAt,
