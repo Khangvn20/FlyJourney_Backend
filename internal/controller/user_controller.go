@@ -5,6 +5,8 @@ import (
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
 	"github.com/gin-gonic/gin"
 	"log"
+	"net/http"
+	"strings"
 )
 
 type UserController struct {
@@ -96,22 +98,30 @@ func (c *UserController) ConfirmResetPassword(ctx *gin.Context) {
 	ctx.JSON(200, result)
 }
 func (c *UserController) Logout(ctx *gin.Context) {
-    tokenString := ctx.GetHeader("Authorization")
-    if tokenString == "" {
-        ctx.JSON(400, gin.H{
+
+
+    authHeader := ctx.GetHeader("Authorization")
+    if authHeader == "" {
+        ctx.JSON(http.StatusBadRequest, gin.H{
             "status":       false,
-            "errorCode":    "INVALID_REQUEST",
+            "errorCode":    "MISSING_TOKEN",
             "errorMessage": "Authorization header is required",
-            "data":         nil,
         })
         return
     }
+    tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+    if tokenString == "" {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_TOKEN",
+            "errorMessage": "Invalid token format",
+        })
+        return
+    }  
     result := c.userService.Logout(tokenString)
-    var statusCode int
-    if result.Status {
-        statusCode = 200
-    } else {
-        statusCode = 400
+    statusCode := http.StatusOK
+    if !result.Status {
+        statusCode = http.StatusInternalServerError
     }
     ctx.JSON(statusCode, result)
 }
@@ -130,6 +140,38 @@ func (c *UserController) GetUserInfo(ctx *gin.Context) {
 	result := c.userService.GetUserInfo(userID.(int))
 
 	var statusCode int
+	if result.Status {
+		statusCode = 200
+	} else {
+		statusCode = 400
+	}
+
+	ctx.JSON(statusCode, result)
+}
+func (c *UserController) UpdateProfile(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(400, gin.H{
+			"status":       false,
+			"errorCode":    "INVALID_REQUEST",	
+			"errorMessage": "User ID not found in context",
+			"data":         nil,
+		})
+		return
+	} 
+	    var req request.UpdateProfileRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(400, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+            "data":         nil,
+        })
+        return
+    }
+    
+ result := c.userService.UpdateProfile(userID.(int), &req)
+		var statusCode int
 	if result.Status {
 		statusCode = 200
 	} else {

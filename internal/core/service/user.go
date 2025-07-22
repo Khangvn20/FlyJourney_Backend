@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"regexp"
 	"time"
+    "log"
 )
 
 type userService struct {
@@ -46,35 +47,55 @@ func handleValidationErrors(message string) *response.Response {
 }
 
 func (s *userService) Register(req *request.RegisterRequest) *response.Response {
-	// Validate email
-	if !validateEmail(req.Email) {
-		return handleValidationErrors("Email is invalid")
-	}
-	// Validate password
-	if len(req.Password) < 6 {
-		return handleValidationErrors("Password must be at least 6 characters")
-	}
-	// Validate name
-	if !validateName(req.Name) {
-		return handleValidationErrors("Name is required and must not be a number")
-	}
-	// Check if email exists
-	userExist, err := s.userRepo.FindByEmail(req.Email)
-	if err != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
-	if userExist != nil {
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.DuplicateUser,
-			ErrorMessage: "Email đã tồn tại",
-		}
-	}
-     otpResult := s.emailOTPService.SendOTPEmail(req.Email)
+    // Validate email
+    if !validateEmail(req.Email) {
+        return handleValidationErrors("Email is invalid")
+    }
+    // Validate password
+    if len(req.Password) < 6 {
+        return handleValidationErrors("Password must be at least 6 characters")
+    }
+    // Validate name
+    if !validateName(req.Name) {
+        return handleValidationErrors("Name is required and must not be a number")
+    }
+
+    // Check if email exists
+    userByEmail, err := s.userRepo.FindByEmail(req.Email)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if userByEmail != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.DuplicateUser,
+            ErrorMessage: "Email is already registered",
+        }
+    }
+
+    // Check if phone exists
+    userByPhone, err := s.userRepo.FindByPhone(req.Phone)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if userByPhone != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.DuplicateUser,
+            ErrorMessage: "Phone number is already registered",
+        }
+    }
+
+    // Send OTP
+    otpResult := s.emailOTPService.SendOTPEmail(req.Email)
     if !otpResult.Status {
         return otpResult
     }
@@ -82,13 +103,13 @@ func (s *userService) Register(req *request.RegisterRequest) *response.Response 
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
-        ErrorMessage: "Đã gửi OTP xác thực email, vui lòng kiểm tra email.",
+        ErrorMessage: "OTP already sent to email, please check your email.",
     }
-	
 }
 func (s *userService) Login(req *request.LoginRequest) *response.Response {
 	  user, err := s.userRepo.FindByEmail(req.Email)
     if err != nil {
+         log.Printf("Error finding user by email: %v", err)
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InternalError,
@@ -112,16 +133,14 @@ func (s *userService) Login(req *request.LoginRequest) *response.Response {
     }
 
     tokenDuration := time.Hour * 24
-    token, err := s.tokenService.GenerateToken(user.UserID, tokenDuration)
+     token, err := s.tokenService.GenerateToken(user.UserID, string(user.Roles), tokenDuration)
     if err != nil {
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InternalError,
-            ErrorMessage: error_code.InternalErrMsg,
+            ErrorMessage: "Login failed",
         }
     }
-
-    // 5. Trả về response
     return &response.Response{
         Status:    true,
         ErrorCode: error_code.Success,
@@ -129,7 +148,7 @@ func (s *userService) Login(req *request.LoginRequest) *response.Response {
             "user_id":   user.UserID,
             "email":     user.Email,
             "name":      user.Name,
-            "role":      user.Role,
+            "role":      user.Roles,
             "token":     token,
            
         },
@@ -173,7 +192,8 @@ func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *resp
         Email:     req.Email,
         Password:  string(hashed),
         Name:      req.Name,
-        Role:      "user",
+        Roles: dto.RoleUser, 
+        Phone:     req.Phone,
         CreatedAt: now,
         UpdatedAt: now,
     }
@@ -191,6 +211,7 @@ func (s *userService) ConfirmRegister(req *request.ConfirmRegisterRequest) *resp
             "user_id": newUser.UserID,
             "email":   newUser.Email,
             "name":    newUser.Name,
+            "phone":   newUser.Phone,
         },
         Status:       true,
         ErrorCode:    error_code.Success,
@@ -213,7 +234,6 @@ func (s *userService) ResetPassword(req *request.ResetPasswordRequest) *response
             ErrorMessage: "Email không tồn tại",
         }
     }
-    // 3. Gửi OTP đến email
     otpResult := s.emailOTPService.SendOTPEmail(req.Email)
     if !otpResult.Status {
         return otpResult
@@ -307,5 +327,56 @@ func (s *userService) GetUserInfo(userID int) *response.Response {
         ErrorCode:    error_code.Success,
         ErrorMessage: error_code.SuccessErrMsg,
         Data:         user, 
+    }
+}
+// Fix the UpdateProfile method where the error is occurring
+
+func (s *userService) UpdateProfile(userID int, req *request.UpdateProfileRequest) *response.Response {
+    existingUser, err := s.userRepo.GetUserByID(userID)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    if existingUser == nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "User not found",
+        }
+    }
+    updatedUser := &dto.User{
+        UserID: userID,
+        Name:   req.Name,
+        Phone:  req.Phone,
+    }
+
+    if req.Name != "" {
+        updatedUser.Name = req.Name
+    } else {
+        updatedUser.Name = existingUser.Name
+    }
+    
+    if req.Phone != "" {
+        updatedUser.Phone = req.Phone
+    } else {
+        updatedUser.Phone = existingUser.Phone
+    }
+      updatedUserResult, err := s.userRepo.UpdateProfile(userID, updatedUser)
+    if err != nil {
+        log.Printf("Error updating profile: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Profile updated successfully",
+        Data:         updatedUserResult,
     }
 }
