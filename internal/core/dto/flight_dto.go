@@ -9,8 +9,8 @@ type Flight struct {
     ArrivalAiportCode string    `json:"arrival_airport_code"`
     DepartureAirportCode string `json:"departure_airport_code"`
     ArrivalAirport    string    `json:"arrival_airport"`
-    DepartureTime     string    `json:"departure_time"`
-    ArrivalTime       string    `json:"arrival_time"`
+    DepartureTime     time.Time    `json:"departure_time"`
+    ArrivalTime       time.Time    `json:"arrival_time"`
     DurationMinutes   int       `json:"duration_minutes"`
     StopsCount        int       `json:"stops_count"`
     TaxAndFees        float64   `json:"tax_and_fees"`
@@ -27,6 +27,7 @@ type FlightClass struct {
     Class          string    `json:"class"` 
     BasePrice      float64   `json:"base_price"`
     BasePriceChild float64   `json:"base_price_child"`
+    BasePriceInfant float64 `json:"base_price_infant"`
     AvailableSeats int       `json:"available_seats"`
     PackageAvailable string  `json:"package_available,omitempty"`
     FreBaggage     string    `json:"free_baggage_allowance,omitempty"`

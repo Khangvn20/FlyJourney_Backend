@@ -6,7 +6,7 @@ type FlightSearchRequest struct {
     ArrivalAirport   string     `json:"arrival_airport" binding:"required"`
     DepartureDate    string `json:"departure_date" binding:"required"`
     ArrivalDate      string `json:"arrival_date" binding:"omitempty"`
-    FlightClass      string     `json:"flight_class" binding:"required"`
+    FlightClass      string     `json:"flight_class" binding:"required"`   
     AirlineIDs       []int      `json:"airline_ids"`
     MaxStops         int        `json:"max_stops"`
     Page             int        `json:"page"`

@@ -2,12 +2,14 @@ package service
 
 import (
     "log"
+    "time"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/repository"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/utils"
 )
 type flightService struct {
 	flightRepo repository.FlightRepository
@@ -42,7 +44,37 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
             ErrorMessage: "At least one flight class must be provided",
         }
     }
-    
+    departureTime, err := utils.ParseTime(req.DepartureTime)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid departure time format",
+        }
+        
+    }
+    arrivalTime, err := utils.ParseTime(req.ArrivalTime)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid arrival time format",
+        }
+    }
+    if arrivalTime.Before(departureTime) {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Arrival time must be after departure time",
+        }
+    }
+    if departureTime.Before(time.Now()) {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Departure time must be in the future",
+        }
+    }
     totalSeats := 0
     for _, fc := range req.FlightClasses {
         if fc.TotalSeats <= 0 {
@@ -59,8 +91,8 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
         FlightNumber:     req.FlightNumber,
         DepartureAirport: req.DepartureAirport,
         ArrivalAirport:   req.ArrivalAirport,
-        DepartureTime:    req.DepartureTime,
-        ArrivalTime:      req.ArrivalTime,
+        DepartureTime:    departureTime,
+        ArrivalTime:      arrivalTime,
         DurationMinutes:  req.DurationMinutes,
         StopsCount:       req.StopsCount,
         TaxAndFees:       req.TaxAndFees,
@@ -89,7 +121,8 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
             BasePrice:      fcReq.BasePrice,
             AvailableSeats: fcReq.AvailableSeats,
             TotalSeats:     fcReq.TotalSeats,
-            PackageAvailable: fcReq.PackageAvailable,
+            BasePriceChild: fcReq.BasePriceChild,
+            BasePriceInfant: fcReq.BasePriceInfant,
         })
     }
     createdClasses, err := s.flightRepo.CreateFlightClasses(createdFlight.FlightID, flightClasses)

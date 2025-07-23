@@ -7,8 +7,8 @@ type AdminFlightDetail struct {
     FlightNumber      string                 `json:"flight_number"`
     DepartureAirport  string                 `json:"departure_airport"`
     ArrivalAirport    string                 `json:"arrival_airport"`
-    DepartureTime     string           `json:"departure_time"`
-    ArrivalTime       string              `json:"arrival_time"`
+    DepartureTime     time.Time           `json:"departure_time"`
+    ArrivalTime       time.Time           `json:"arrival_time"`
     DurationMinutes   int                    `json:"duration_minutes"`
     StopsCount        int                    `json:"stops_count"`
     TaxAndFees        float64                `json:"tax_and_fees"`

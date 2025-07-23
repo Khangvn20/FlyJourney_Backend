@@ -9,7 +9,7 @@ type CreateFlightRequest struct {
     DepartureAirport string    `json:"departure_airport" binding:"required"`
     ArrivalAirport   string    `json:"arrival_airport" binding:"required"`
     DepartureTime    string    `json:"departure_time" binding:"required"`
-    ArrivalTime      string    `json:"arrival_time" binding:"required"`
+    ArrivalTime      string   `json:"arrival_time" binding:"required"`
     DepartureCode    string    `json:"departure_airport_code" binding:"required"`
     ArrivalAirportCode string   `json:"arrival_airport_code" binding:"required"`
     DurationMinutes  int       `json:"duration_minutes" binding:"required"`
@@ -24,7 +24,8 @@ type FlightClassRequest struct {
     Class          string  `json:"class" binding:"required,oneof=economy premium_economy business first"`
     BasePrice      float64 `json:"base_price" binding:"required"`
     AvailableSeats int     `json:"available_seats" binding:"required"`
-    BasePriceChild float64 `json:"base_price_child,omitempty"`
+    BasePriceInfant float64 `json:"base_price_infant" binding:"required"` // Optional, can be zero
+    BasePriceChild float64 `json:"base_price_child" binding:"required"`
     TotalSeats     int     `json:"total_seats" binding:"required"`
     PackageAvailable string  `json:"package_available"`
 }
