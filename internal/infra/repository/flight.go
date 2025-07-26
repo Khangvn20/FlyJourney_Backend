@@ -189,31 +189,37 @@ func (r *flightRepository) Update(id int, flight *dto.Flight) (*dto.Flight, erro
 
     query := `
         UPDATE flights
-        SET airline_id = $1, aircraft_id = $2, flight_number = $3, departure_airport = $4, 
-            arrival_airport = $5, departure_time = $6, arrival_time = $7, duration_minutes = $8,
-            stops_count = $9, tax_and_fees = $10, total_seats = $11, status = $12,
-            gate = $13, terminal = $14, distance = $15, updated_at = NOW()
+        SET airline_id = $1, flight_number = $2, departure_airport = $3, 
+            arrival_airport = $4, departure_time = $5, arrival_time = $6, 
+            duration_minutes = $7, stops_count = $8, tax_and_fees = $9, 
+            total_seats = $10, status = $11, distance = $12,
+            departure_airport_code = $13, arrival_airport_code = $14, 
+            currency = $15, updated_at = NOW()
         WHERE flight_id = $16
-        RETURNING flight_id, airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
+        RETURNING flight_id, airline_id, flight_number, departure_airport, arrival_airport,
                   departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
-                  total_seats, status, gate, terminal, distance, created_at, updated_at
+                  total_seats, status, distance, departure_airport_code, arrival_airport_code,
+                  currency, created_at, updated_at
     `
 
     var updatedFlight dto.Flight
     err := r.db.QueryRow(ctx, query,
-        flight.AirlineID,
-        flight.FlightNumber,
-        flight.DepartureAirport,
-        flight.ArrivalAirport,
-        flight.DepartureTime,
-        flight.ArrivalTime,
-        flight.DurationMinutes,
-        flight.StopsCount,
-        flight.TaxAndFees,
-        flight.TotalSeats,
-        flight.Status,
-        flight.Distance,
-        id,
+        flight.AirlineID,         
+        flight.FlightNumber,          
+        flight.DepartureAirport,     
+        flight.ArrivalAirport,      
+        flight.DepartureTime,        
+        flight.ArrivalTime,         
+        flight.DurationMinutes,     
+        flight.StopsCount,         
+        flight.TaxAndFees,           
+        flight.TotalSeats,           
+        flight.Status,                 
+        flight.Distance,              
+        flight.DepartureAirportCode,   
+        flight.ArrivalAiportCode,      
+        flight.Currency,               
+        id,                            
     ).Scan(
         &updatedFlight.FlightID,
         &updatedFlight.AirlineID,
@@ -228,6 +234,9 @@ func (r *flightRepository) Update(id int, flight *dto.Flight) (*dto.Flight, erro
         &updatedFlight.TotalSeats,
         &updatedFlight.Status,
         &updatedFlight.Distance,
+        &updatedFlight.DepartureAirportCode,
+        &updatedFlight.ArrivalAiportCode,
+        &updatedFlight.Currency,
         &updatedFlight.CreatedAt,
         &updatedFlight.UpdatedAt,
     )
@@ -346,13 +355,16 @@ func (r *flightRepository) GetByRoute(departureAirport, arrivalAirport string, d
 func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
-      flightQuery := `
-        SELECT flight_id, airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
+    
+    flightQuery := `
+        SELECT flight_id, airline_id, flight_number, departure_airport, arrival_airport,
                departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
-               status, gate, terminal, distance, created_at, updated_at
+               total_seats, status, distance, departure_airport_code, arrival_airport_code,
+               currency, created_at, updated_at
         FROM flights
         WHERE flight_id = $1
     `
+    
     var flight dto.Flight
     err := r.db.QueryRow(ctx, flightQuery, id).Scan(
         &flight.FlightID,
@@ -365,8 +377,12 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
         &flight.DurationMinutes,
         &flight.StopsCount,
         &flight.TaxAndFees,
+        &flight.TotalSeats,
         &flight.Status,
         &flight.Distance,
+        &flight.DepartureAirportCode,
+        &flight.ArrivalAiportCode,
+        &flight.Currency,
         &flight.CreatedAt,
         &flight.UpdatedAt,
     )
@@ -376,8 +392,9 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
         }
         return nil, nil, fmt.Errorf("error getting flight by ID: %w", err)
     }
+    
     flightClassesQuery := `
-        SELECT flight_class_id, flight_id, class, base_price, available_seats, total_seats, package_available
+        SELECT flight_class_id, flight_id, class, base_price, available_seats, total_seats, base_price_child, base_price_infant, fare_class_code
         FROM flight_classes
         WHERE flight_id = $1
         ORDER BY base_price ASC
@@ -400,7 +417,9 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
             &fc.BasePrice,
             &fc.AvailableSeats,
             &fc.TotalSeats,
-            &fc.PackageAvailable,
+            &fc.BasePriceChild,
+            &fc.BasePriceInfant,
+            &fc.FareClassCode,
         ); err != nil {
             return &flight, nil, fmt.Errorf("error scanning flight class: %w", err)
         }

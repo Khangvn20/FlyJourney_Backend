@@ -1,6 +1,6 @@
 package request
 import (
-	"time"
+
 )
 
 type CreateFlightRequest struct {
@@ -28,18 +28,19 @@ type FlightClassRequest struct {
     BasePriceInfant float64 `json:"base_price_infant" binding:"required"` // Optional, can be zero
     BasePriceChild float64 `json:"base_price_child" binding:"required"`
     TotalSeats     int     `json:"total_seats" binding:"required"`
-    PackageAvailable string  `json:"package_available"`
 }
 type UpdateFlightRequest struct {
     AirlineID       int       `json:"airline_id" validate:"required"`
-    AircraftID      int       `json:"aircraft_id" validate:"required"`
     FlightNumber    string    `json:"flight_number" validate:"required"`
     DepartureAirport string    `json:"departure_airport" validate:"required"`
+    DepartureAirportCode string `json:"departure_airport_code" validate:"required"`
+    ArrivalAirportCode   string    `json:"arrival_airport_code" validate:"required"`
     ArrivalAirport  string    `json:"arrival_airport" validate:"required"`
-    DepartureTime   time.Time `json:"departure_time" validate:"required"`
-    ArrivalTime     time.Time `json:"arrival_time" validate:"required"`
+    DepartureTime   string `json:"departure_time" validate:"required"`
+    ArrivalTime     string `json:"arrival_time" validate:"required"`
     DurationMinutes int       `json:"duration_minutes" validate:"required,min=1"`
     StopsCount      int       `json:"stops_count" validate:"required,min=0"`
+    Currency        string    `json:"currency" validate:"required"`
     TotalSeats      int       `json:"total_seats" validate:"required,min=1"`
     TaxAndFees      float64   `json:"tax_and_fees" validate:"required,min=0"`
     Status          string    `json:"status" validate:"required,oneof=scheduled delayed cancelled boarding departed arrived diverted"`
@@ -61,4 +62,7 @@ type UpdateFlightClassRequest struct {
     BasePrice      float64 `json:"base_price" binding:"required"`
     AvailableSeats int     `json:"available_seats" binding:"required"`
     TotalSeats     int     `json:"total_seats" binding:"required"`
+    BasePriceChild float64 `json:"base_price_child" binding:"required"`
+    BasePriceInfant float64 `json:"base_price_infant" binding:"required"`
+    FareClassCode  string  `json:"fare_class_code" binding:"required"`
 }
