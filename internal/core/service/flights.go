@@ -20,6 +20,57 @@ func NewFlightService(flightRepo repository.FlightRepository) service.FlightServ
 		flightRepo: flightRepo,
 	}
 }
+func (s *flightService) CreateFlightClasses(flightID int, req []request.FlightClassRequest) (*response.Response, error) {
+    if len(req) == 0 {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "At least one flight class must be provided",
+        }, nil
+    }
+
+    // Convert request to DTO
+    flightClasses := make([]*dto.FlightClass, 0, len(req))
+    for _, fcReq := range req {
+        if fcReq.TotalSeats <= 0 {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InvalidRequest,
+                ErrorMessage: "Total seats for each flight class must be greater than zero",
+            }, nil
+        }
+
+        flightClasses = append(flightClasses, &dto.FlightClass{
+            FlightID:         flightID,
+            Class:            fcReq.Class,
+            FareClassCode:    fcReq.FareClassCode,
+            BasePrice:        fcReq.BasePrice,
+            AvailableSeats:   fcReq.AvailableSeats,
+            TotalSeats:       fcReq.TotalSeats,
+            BasePriceChild:   fcReq.BasePriceChild,
+            BasePriceInfant:  fcReq.BasePriceInfant,
+        })
+    }
+
+    createdClasses, err := s.flightRepo.CreateFlightClasses(flightID, flightClasses)
+    if err != nil {
+        log.Printf("Error creating flight classes: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Failed to create flight classes",
+        }, err
+    }
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Flight classes created successfully",
+        Data: map[string]interface{}{
+            "flight_classes": createdClasses,
+        },
+    }, nil
+}
 func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response.Response {
 		existingFlight, err := s.flightRepo.GetByFlightNumber(req.FlightNumber)
     if err != nil {
@@ -123,6 +174,7 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
             TotalSeats:     fcReq.TotalSeats,
             BasePriceChild: fcReq.BasePriceChild,
             BasePriceInfant: fcReq.BasePriceInfant,
+            FareClassCode:  fcReq.FareClassCode,
         })
     }
     createdClasses, err := s.flightRepo.CreateFlightClasses(createdFlight.FlightID, flightClasses)
@@ -141,7 +193,7 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
         ErrorMessage: "",
         Data: map[string]interface{}{
             "flight":         createdFlight,
-            "flight_classes": createdClasses,
+            "flight_classes": createdClasses, 
         },
     }      
     

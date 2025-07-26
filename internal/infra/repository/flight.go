@@ -86,14 +86,14 @@ func (r *flightRepository) CreateFlightClasses(flightID int, classes []*dto.Flig
     totalSeats := 0
     for _, fc := range classes {
         query := `
-            INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats, base_price_child, base_price_infant)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats, base_price_child, base_price_infant,fare_class_code)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING flight_class_id
         `
         
         var flightClassID int
         err := tx.QueryRow(ctx, query,
-            flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats,fc.BasePriceChild,fc.BasePriceInfant).Scan(&flightClassID)
+            flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats,fc.BasePriceChild,fc.BasePriceInfant,fc.FareClassCode).Scan(&flightClassID)
              
         if err != nil {
             log.Printf("Error creating flight class: %v", err)

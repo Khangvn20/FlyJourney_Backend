@@ -26,6 +26,7 @@ type FlightClass struct {
     FlightID       int       `json:"flight_id"`
     Class          string    `json:"class"` 
     BasePrice      float64   `json:"base_price"`
+    FareClassCode string    `json:"fare_class_code"`
     BasePriceChild float64   `json:"base_price_child"`
     BasePriceInfant float64 `json:"base_price_infant"`
     AvailableSeats int       `json:"available_seats"`

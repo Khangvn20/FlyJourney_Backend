@@ -5,6 +5,7 @@ import (
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
 )
 type FlightService interface {
+	CreateFlightClasses(flightID int, classes []request.FlightClassRequest) (*response.Response, error)
 	CreateFlight(request *request.CreateFlightRequest) *response.Response
 	GetFlightByID(flightID int) *response.Response
 	GetAllFlights(page, limit int) *response.Response

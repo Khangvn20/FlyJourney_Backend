@@ -22,6 +22,7 @@ type CreateFlightRequest struct {
 }
 type FlightClassRequest struct {
     Class          string  `json:"class" binding:"required,oneof=economy premium_economy business first"`
+    FareClassCode string `json:"fare_class_code" binding:"required"`
     BasePrice      float64 `json:"base_price" binding:"required"`
     AvailableSeats int     `json:"available_seats" binding:"required"`
     BasePriceInfant float64 `json:"base_price_infant" binding:"required"` // Optional, can be zero
