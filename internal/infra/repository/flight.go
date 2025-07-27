@@ -20,15 +20,19 @@ func NewFlightRepository(db *pgxpool.Pool) *flightRepository {
 func (r *flightRepository) CreateFlight(flight *dto.Flight) (*dto.Flight, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
+    
     tx, err := r.db.Begin(ctx)
     if err != nil {
         return nil, fmt.Errorf("failed to begin transaction: %w", err)
     }
     defer tx.Rollback(ctx)
-    query := `
-        INSERT INTO flights (airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
-                           departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
-                           status, gate, terminal, distance, total_seats, created_at, updated_at)
+    
+     query := `
+        INSERT INTO flights (airline_id, flight_number, departure_airport, arrival_airport,
+                           duration_minutes, stops_count, tax_and_fees, total_seats, status,
+                           distance, departure_time, arrival_time, 
+                           departure_airport_code, arrival_airport_code, currency,
+                           created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         RETURNING flight_id
     `
@@ -37,10 +41,23 @@ func (r *flightRepository) CreateFlight(flight *dto.Flight) (*dto.Flight, error)
     
     var flightID int
     err = tx.QueryRow(ctx, query,
-        flight.AirlineID, flight.AircraftID, flight.FlightNumber, flight.DepartureAirport,
-        flight.ArrivalAirport, flight.DepartureTime, flight.ArrivalTime, flight.DurationMinutes,
-        flight.StopsCount, flight.TaxAndFees, flight.Status, flight.Gate, flight.Terminal,
-        flight.Distance, flight.TotalSeats, now, now).Scan(&flightID)
+        flight.AirlineID,          
+        flight.FlightNumber,         
+        flight.DepartureAirport,     
+        flight.ArrivalAirport,      
+        flight.DurationMinutes,      
+        flight.StopsCount,           
+        flight.TaxAndFees,        
+        flight.TotalSeats,         
+        flight.Status,             
+        flight.Distance,           
+        flight.DepartureTime,       
+        flight.ArrivalTime,         
+        flight.DepartureAirportCode, 
+        flight.ArrivalAiportCode,   
+        flight.Currency,             
+        now,
+        now).Scan(&flightID)
         
     if err != nil {
         return nil, fmt.Errorf("failed to create flight: %w", err)
@@ -49,6 +66,7 @@ func (r *flightRepository) CreateFlight(flight *dto.Flight) (*dto.Flight, error)
     flight.FlightID = flightID
     flight.CreatedAt = now
     flight.UpdatedAt = now
+    
     if err := tx.Commit(ctx); err != nil {
         return nil, fmt.Errorf("failed to commit transaction: %w", err)
     }
@@ -66,17 +84,16 @@ func (r *flightRepository) CreateFlightClasses(flightID int, classes []*dto.Flig
     defer tx.Rollback(ctx)
     createdClasses := make([]*dto.FlightClass, 0, len(classes))
     totalSeats := 0
-   for _, fc := range classes {
-    log.Printf("PackageAvailable: '%s' (length: %d)", fc.PackageAvailable, len(fc.PackageAvailable))
+    for _, fc := range classes {
         query := `
-            INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats, package_available)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO flight_classes (flight_id, class, base_price, available_seats, total_seats, base_price_child, base_price_infant,fare_class_code)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING flight_class_id
         `
         
         var flightClassID int
         err := tx.QueryRow(ctx, query,
-            flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats, fc.PackageAvailable).Scan(&flightClassID)
+            flightID, fc.Class, fc.BasePrice, fc.AvailableSeats, fc.TotalSeats,fc.BasePriceChild,fc.BasePriceInfant,fc.FareClassCode).Scan(&flightClassID)
              
         if err != nil {
             log.Printf("Error creating flight class: %v", err)
@@ -137,7 +154,7 @@ func (r *flightRepository) GetAll(page, limit int) ([]*dto.Flight, error) {
         err := rows.Scan(
             &flight.FlightID,
             &flight.AirlineID,
-            &flight.AircraftID,
+         
             &flight.FlightNumber,
             &flight.DepartureAirport,
             &flight.ArrivalAirport,
@@ -148,8 +165,6 @@ func (r *flightRepository) GetAll(page, limit int) ([]*dto.Flight, error) {
             &flight.TaxAndFees,
             &flight.TotalSeats,
             &flight.Status,
-            &flight.Gate,
-            &flight.Terminal,
             &flight.Distance,
             &flight.CreatedAt,
             &flight.UpdatedAt,
@@ -174,38 +189,40 @@ func (r *flightRepository) Update(id int, flight *dto.Flight) (*dto.Flight, erro
 
     query := `
         UPDATE flights
-        SET airline_id = $1, aircraft_id = $2, flight_number = $3, departure_airport = $4, 
-            arrival_airport = $5, departure_time = $6, arrival_time = $7, duration_minutes = $8,
-            stops_count = $9, tax_and_fees = $10, total_seats = $11, status = $12,
-            gate = $13, terminal = $14, distance = $15, updated_at = NOW()
+        SET airline_id = $1, flight_number = $2, departure_airport = $3, 
+            arrival_airport = $4, departure_time = $5, arrival_time = $6, 
+            duration_minutes = $7, stops_count = $8, tax_and_fees = $9, 
+            total_seats = $10, status = $11, distance = $12,
+            departure_airport_code = $13, arrival_airport_code = $14, 
+            currency = $15, updated_at = NOW()
         WHERE flight_id = $16
-        RETURNING flight_id, airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
+        RETURNING flight_id, airline_id, flight_number, departure_airport, arrival_airport,
                   departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
-                  total_seats, status, gate, terminal, distance, created_at, updated_at
+                  total_seats, status, distance, departure_airport_code, arrival_airport_code,
+                  currency, created_at, updated_at
     `
 
     var updatedFlight dto.Flight
     err := r.db.QueryRow(ctx, query,
-        flight.AirlineID,
-        flight.AircraftID,
-        flight.FlightNumber,
-        flight.DepartureAirport,
-        flight.ArrivalAirport,
-        flight.DepartureTime,
-        flight.ArrivalTime,
-        flight.DurationMinutes,
-        flight.StopsCount,
-        flight.TaxAndFees,
-        flight.TotalSeats,
-        flight.Status,
-        flight.Gate,
-        flight.Terminal,
-        flight.Distance,
-        id,
+        flight.AirlineID,         
+        flight.FlightNumber,          
+        flight.DepartureAirport,     
+        flight.ArrivalAirport,      
+        flight.DepartureTime,        
+        flight.ArrivalTime,         
+        flight.DurationMinutes,     
+        flight.StopsCount,         
+        flight.TaxAndFees,           
+        flight.TotalSeats,           
+        flight.Status,                 
+        flight.Distance,              
+        flight.DepartureAirportCode,   
+        flight.ArrivalAiportCode,      
+        flight.Currency,               
+        id,                            
     ).Scan(
         &updatedFlight.FlightID,
         &updatedFlight.AirlineID,
-        &updatedFlight.AircraftID,
         &updatedFlight.FlightNumber,
         &updatedFlight.DepartureAirport,
         &updatedFlight.ArrivalAirport,
@@ -216,9 +233,10 @@ func (r *flightRepository) Update(id int, flight *dto.Flight) (*dto.Flight, erro
         &updatedFlight.TaxAndFees,
         &updatedFlight.TotalSeats,
         &updatedFlight.Status,
-        &updatedFlight.Gate,
-        &updatedFlight.Terminal,
         &updatedFlight.Distance,
+        &updatedFlight.DepartureAirportCode,
+        &updatedFlight.ArrivalAiportCode,
+        &updatedFlight.Currency,
         &updatedFlight.CreatedAt,
         &updatedFlight.UpdatedAt,
     )
@@ -238,9 +256,9 @@ func (r *flightRepository) GetByFlightNumber(flightNumber string) (*dto.Flight, 
     defer cancel()
 
     query := `
-        SELECT flight_id, airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
+        SELECT flight_id, airline_id, flight_number, departure_airport, arrival_airport,
                departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
-               total_seats, status, gate, terminal, distance, created_at, updated_at
+               total_seats, status, distance, created_at, updated_at
         FROM flights
         WHERE flight_number = $1
     `
@@ -249,7 +267,6 @@ func (r *flightRepository) GetByFlightNumber(flightNumber string) (*dto.Flight, 
     err := r.db.QueryRow(ctx, query, flightNumber).Scan(
         &flight.FlightID,
         &flight.AirlineID,
-        &flight.AircraftID,
         &flight.FlightNumber,
         &flight.DepartureAirport,
         &flight.ArrivalAirport,
@@ -260,8 +277,6 @@ func (r *flightRepository) GetByFlightNumber(flightNumber string) (*dto.Flight, 
         &flight.TaxAndFees,
         &flight.TotalSeats,
         &flight.Status,
-        &flight.Gate,
-        &flight.Terminal,
         &flight.Distance,
         &flight.CreatedAt,
         &flight.UpdatedAt,
@@ -269,7 +284,7 @@ func (r *flightRepository) GetByFlightNumber(flightNumber string) (*dto.Flight, 
 
     if err != nil {
         if err == pgx.ErrNoRows {
-            return nil, nil // Flight not found
+            return nil, nil 
         }
         log.Printf("Error getting flight by flight number: %v", err)
         return nil, err
@@ -309,7 +324,6 @@ func (r *flightRepository) GetByRoute(departureAirport, arrivalAirport string, d
         err := rows.Scan(
             &flight.FlightID,
             &flight.AirlineID,
-            &flight.AircraftID,
             &flight.FlightNumber,
             &flight.DepartureAirport,
             &flight.ArrivalAirport,
@@ -320,8 +334,6 @@ func (r *flightRepository) GetByRoute(departureAirport, arrivalAirport string, d
             &flight.TaxAndFees,
             &flight.TotalSeats,
             &flight.Status,
-            &flight.Gate,
-            &flight.Terminal,
             &flight.Distance,
             &flight.CreatedAt,
             &flight.UpdatedAt,
@@ -343,18 +355,20 @@ func (r *flightRepository) GetByRoute(departureAirport, arrivalAirport string, d
 func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
-      flightQuery := `
-        SELECT flight_id, airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
+    
+    flightQuery := `
+        SELECT flight_id, airline_id, flight_number, departure_airport, arrival_airport,
                departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
-               status, gate, terminal, distance, created_at, updated_at
+               total_seats, status, distance, departure_airport_code, arrival_airport_code,
+               currency, created_at, updated_at
         FROM flights
         WHERE flight_id = $1
     `
+    
     var flight dto.Flight
     err := r.db.QueryRow(ctx, flightQuery, id).Scan(
         &flight.FlightID,
         &flight.AirlineID,
-        &flight.AircraftID,
         &flight.FlightNumber,
         &flight.DepartureAirport,
         &flight.ArrivalAirport,
@@ -363,10 +377,12 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
         &flight.DurationMinutes,
         &flight.StopsCount,
         &flight.TaxAndFees,
+        &flight.TotalSeats,
         &flight.Status,
-        &flight.Gate,
-        &flight.Terminal,
         &flight.Distance,
+        &flight.DepartureAirportCode,
+        &flight.ArrivalAiportCode,
+        &flight.Currency,
         &flight.CreatedAt,
         &flight.UpdatedAt,
     )
@@ -376,11 +392,15 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
         }
         return nil, nil, fmt.Errorf("error getting flight by ID: %w", err)
     }
+    
     flightClassesQuery := `
-        SELECT flight_class_id, flight_id, class, base_price, available_seats, total_seats, package_available
-        FROM flight_classes
-        WHERE flight_id = $1
-        ORDER BY base_price ASC
+        SELECT fc.flight_class_id, fc.flight_id, fc.class, fc.base_price, fc.available_seats, 
+               fc.total_seats, fc.base_price_child, fc.base_price_infant, fc.fare_class_code,
+               fcc.fare_class_code,fcc.cabin_class, fcc.refundable, fcc.changeable, fcc.baggage_kg, fcc.description
+        FROM flight_classes fc
+        LEFT JOIN fare_classes fcc ON fc.fare_class_code = fcc.fare_class_code
+        WHERE fc.flight_id = $1
+        ORDER BY fc.base_price ASC
     `
 
     rows, err := r.db.Query(ctx, flightClassesQuery, id)
@@ -393,6 +413,8 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
 
     for rows.Next() {
         var fc dto.FlightClass
+        var fareClass dto.FareClasses
+        
         if err := rows.Scan(
             &fc.FlightClassID,
             &fc.FlightID,
@@ -400,10 +422,19 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
             &fc.BasePrice,
             &fc.AvailableSeats,
             &fc.TotalSeats,
-            &fc.PackageAvailable,
+            &fc.BasePriceChild,
+            &fc.BasePriceInfant,
+            &fc.FareClassCode,
+            &fareClass.FareClassCode,
+            &fareClass.CabinClass,
+            &fareClass.Refundable,
+            &fareClass.Changeable,
+            &fareClass.Baggage_kg,
+            &fareClass.Description,
         ); err != nil {
             return &flight, nil, fmt.Errorf("error scanning flight class: %w", err)
         }
+         fc.FareClassDetails = &fareClass
         flightClasses = append(flightClasses, &fc)
     }
 
@@ -443,7 +474,6 @@ func (r *flightRepository) GetByAirline(airlineID int, page, limit int) ([]*dto.
         err := rows.Scan(
             &flight.FlightID,
             &flight.AirlineID,
-            &flight.AircraftID,
             &flight.FlightNumber,
             &flight.DepartureAirport,
             &flight.ArrivalAirport,
@@ -454,8 +484,6 @@ func (r *flightRepository) GetByAirline(airlineID int, page, limit int) ([]*dto.
             &flight.TaxAndFees,
             &flight.TotalSeats,
             &flight.Status,
-            &flight.Gate,
-            &flight.Terminal,
             &flight.Distance,
             &flight.CreatedAt,
             &flight.UpdatedAt,
@@ -505,7 +533,6 @@ func (r *flightRepository) GetByStatus(status string, page, limit int) ([]*dto.F
         err := rows.Scan(
             &flight.FlightID,
             &flight.AirlineID,
-            &flight.AircraftID,
             &flight.FlightNumber,
             &flight.DepartureAirport,
             &flight.ArrivalAirport,
@@ -516,8 +543,6 @@ func (r *flightRepository) GetByStatus(status string, page, limit int) ([]*dto.F
             &flight.TaxAndFees,
             &flight.TotalSeats,
             &flight.Status,
-            &flight.Gate,
-            &flight.Terminal,
             &flight.Distance,
             &flight.CreatedAt,
             &flight.UpdatedAt,
@@ -540,7 +565,7 @@ func (r *flightRepository) GetByStatus(status string, page, limit int) ([]*dto.F
 func (r *flightRepository) SearchFlights(
     departureAirport string,
     arrivalAirport string, 
-    departureDate time.Time, 
+    departureDate string, 
     class string, 
     airlineIDs []int, 
     maxStops int, 
@@ -552,9 +577,6 @@ func (r *flightRepository) SearchFlights(
 ) ([]*dto.FlightSearchResult, error) {  
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
-    
-    log.Printf("Tìm kiếm chuyến bay một chiều: từ %s đến %s vào ngày %s, hạng ghế: %s", 
-    departureAirport, arrivalAirport, departureDate.Format("2006-01-02"), class)
    args := []interface{}{
         departureAirport,
         arrivalAirport,
@@ -563,19 +585,18 @@ func (r *flightRepository) SearchFlights(
     argIndex := 4
     
     baseQuery := `
-        SELECT f.flight_id, f.airline_id, a.name as airline_name, f.flight_number, 
-               f.departure_airport, f.arrival_airport, f.departure_time, f.arrival_time, 
-               f.duration_minutes, f.stops_count, f.tax_and_fees, 
-               f.status, f.gate, f.terminal, f.distance, 
+        SELECT f.flight_id, f.airline_id, a.name as airline_name, f.flight_number,
+               f.departure_airport, f.arrival_airport, f.departure_time, f.arrival_time,
+               f.duration_minutes, f.stops_count, f.tax_and_fees,
+               f.status, f.gate, f.terminal, f.distance,
                fc.class as flight_class, fc.base_price as class_price,
                fc.available_seats as class_availability, f.total_seats, fc.package_available
         FROM flights f
         JOIN flight_classes fc ON f.flight_id = fc.flight_id
         JOIN airlines a ON f.airline_id = a.airline_id
-        WHERE f.departure_airport = $1 
-        AND f.arrival_airport = $2 
-        AND f.departure_time::date = $3::date
-    `
+        WHERE f.departure_airport = $1
+        AND f.arrival_airport = $2
+        AND f.departure_time LIKE $3 || '%'`
     if  forUser {
         baseQuery += " AND f.status = 'scheduled'"
     
@@ -630,20 +651,23 @@ func (r *flightRepository) SearchFlights(
             &result.FlightNumber,
             &result.DepartureAirport,
             &result.ArrivalAirport,
+            &result.DepartureAirportCode,
+            &result.ArrivalAirportCode,       
             &result.DepartureTime,
             &result.ArrivalTime,
             &result.DurationMinutes,
             &result.StopsCount,
             &result.TaxAndFees,
             &result.Status,
-            &result.Gate,
-            &result.Terminal,
             &result.Distance,
             &result.FlightClass,
-            &result.ClassPrice,
-            &result.ClassAvailability,
             &totalSeats,
-            &result.PackageAvailable,
+            &result.BasePrice,
+            &result.BasePriceChild,
+            &result.BasePriceInfant,
+            &result.FareClassCode,
+            &result.FareClassDetails,
+
         )
         
         if err != nil {
@@ -653,7 +677,7 @@ func (r *flightRepository) SearchFlights(
         if totalSeats.Valid {
             result.TotalSeats = int(totalSeats.Int32)
         }
-        result.TotalPrice = result.ClassPrice + result.TaxAndFees
+        result.TotalPrice = result.BasePrice + result.TaxAndFees
         
         results = append(results, &result)
     }
@@ -682,16 +706,18 @@ func (r *flightRepository) Count() (int, error) {
     return count, nil
 }
 
-func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string, departureDate time.Time, forUser bool,) (int, error) {
+func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string, departureDate string, forUser bool,) (int, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
      query := `
-        SELECT COUNT(*) 
+        SELECT COUNT(*)
         FROM flights f
-        WHERE f.departure_airport = $1 AND f.arrival_airport = $2
-          AND f.departure_time::date = $3::date
-    `
+        JOIN flight_classes fc ON f.flight_id = fc.flight_id
+        WHERE f.departure_airport = $1
+        AND f.arrival_airport = $2
+        AND f.departure_time LIKE $3 || '%'`
+
      if forUser {
         query += " AND f.status = 'scheduled'"
     }
@@ -726,8 +752,8 @@ func (r *flightRepository) UpdateStatus(id int, status string) error {
 func (r *flightRepository) SearchRoundtripFlights(
     departureAirport string,
     arrivalAirport string,
-    departureDate time.Time,
-    returnDate time.Time,
+    departureDate string,
+    returnDate string ,
     class string,
     airlineIDs []int,
     maxStops int,
@@ -737,10 +763,9 @@ func (r *flightRepository) SearchRoundtripFlights(
     sortOrder string,
 ) (*dto.RoundtripSearchResult, error) {
 
-    
-    log.Printf("Tìm kiếm chuyến bay khứ hồi: từ %s đến %s, đi ngày %s, về ngày %s, hạng ghế: %s", 
-        departureAirport, arrivalAirport, departureDate.Format("2006-01-02"), 
-        returnDate.Format("2006-01-02"), class)
+    log.Printf("Tìm kiếm chuyến bay một chiều: từ %s đến %s vào ngày %s, hạng ghế: %s", 
+        departureAirport, arrivalAirport, departureDate, class)
+
 
         outboundFlights, err := r.SearchFlights(
         departureAirport,

@@ -4,33 +4,36 @@ import "time"
 type Flight struct {
     FlightID          int       `json:"flight_id"`
     AirlineID         int       `json:"airline_id"`
-	AircraftID        int       `json:"aircraft_id"`
     FlightNumber      string    `json:"flight_number"`
     DepartureAirport  string    `json:"departure_airport"`
+    ArrivalAiportCode string    `json:"arrival_airport_code"`
+    DepartureAirportCode string `json:"departure_airport_code"`
     ArrivalAirport    string    `json:"arrival_airport"`
-    DepartureTime     time.Time `json:"departure_time"`
-    ArrivalTime       time.Time `json:"arrival_time"`
+    DepartureTime     time.Time    `json:"departure_time"`
+    ArrivalTime       time.Time    `json:"arrival_time"`
     DurationMinutes   int       `json:"duration_minutes"`
     StopsCount        int       `json:"stops_count"`
     TaxAndFees        float64   `json:"tax_and_fees"`
     TotalSeats        int       `json:"total_seats"`
     Status            string    `json:"status"`
-    Gate              string    `json:"gate"`
-    Terminal          string    `json:"terminal"`
+    Currency          string    `json:"currency"`
     Distance          int       `json:"distance"`
     CreatedAt         time.Time `json:"created_at"`
     UpdatedAt         time.Time `json:"updated_at"`
-
 }
 type FlightClass struct {
     FlightClassID  int       `json:"flight_class_id"`
     FlightID       int       `json:"flight_id"`
     Class          string    `json:"class"` 
     BasePrice      float64   `json:"base_price"`
+    FareClassCode  string    `json:"fare_class_code"`
+    BasePriceChild float64   `json:"base_price_child"`
+    BasePriceInfant float64 `json:"base_price_infant"`
     AvailableSeats int       `json:"available_seats"`
-    PackageAvailable string  `json:"package_available,omitempty"`
+    FreBaggage     string    `json:"free_baggage_allowance,omitempty"`
     TotalSeats     int       `json:"total_seats"`
     CreatedAt      time.Time `json:"created_at,omitempty"`
+    FareClassDetails  *FareClasses  `json:"fare_class_details,omitempty"`
     UpdatedAt      time.Time `json:"updated_at,omitempty"`
 }
 type FlightSearchResult struct {
@@ -40,25 +43,37 @@ type FlightSearchResult struct {
     FlightNumber      string    `json:"flight_number"`
     DepartureAirport  string    `json:"departure_airport"`
     ArrivalAirport    string    `json:"arrival_airport"`
-    DepartureTime     time.Time `json:"departure_time"`
-    ArrivalTime       time.Time `json:"arrival_time"`
+    DepartureTime     string `json:"departure_time"`
+    ArrivalTime       string `json:"arrival_time"`
     DurationMinutes   int       `json:"duration_minutes"`
     StopsCount        int       `json:"stops_count"`
     BasePrice         float64   `json:"base_price"`
+    BasePriceChild    float64   `json:"base_price_child,omitempty"`
+    BasePriceInfant   float64   `json:"base_price_infant,omitempty"`
+    FareClassCode     string    `json:"fare_class_code"`
+    FareClassDetails  *FareClasses `json:"fare_class_details,omitempty"`
+    DepartureAirportCode string `json:"departure_airport_code"`
+    ArrivalAirportCode string `json:"arrival_airport_code"`
     TaxAndFees        float64   `json:"tax_and_fees"`
     TotalPrice        float64   `json:"total_price"`
     AvailableSeats    int       `json:"available_seats"`
+    Currency          string    `json:"currency"`
     TotalSeats        int       `json:"total_seats"`
     Status            string    `json:"status"`
     FlightClass       string    `json:"flight_class"`
-    Gate              string    `json:"gate,omitempty"`
-    Terminal          string    `json:"terminal,omitempty"`
     Distance          int       `json:"distance,omitempty"`
-    ClassPrice        float64   `json:"class_price"`
-    ClassAvailability int       `json:"class_availability"`
-    PackageAvailable  string    `json:"package_available,omitempty"`
+
 }
 type RoundtripSearchResult struct {
     OutboundFlights []*FlightSearchResult `json:"outbound_flights"`
     InboundFlights  []*FlightSearchResult `json:"inbound_flights"`
+}
+type FareClasses struct {
+    FareClassCode string `json:"fare_class_code"`
+    CabinClass    string  `json:"cabin_class"`
+    Refundable    bool   `json:"refundable"`
+    Changeable    bool   `json:"changeable"`
+    Baggage_kg    string    `json:"baggage_kg"`
+    Description   string    `json:"description"`
+    
 }

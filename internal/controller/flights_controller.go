@@ -37,6 +37,44 @@ func (c *FlightController) CreateFlight(ctx *gin.Context) {
     
     ctx.JSON(statusCode, result)
 }
+func (c *FlightController) CreateFlightClasses(ctx *gin.Context) {
+     flightIDStr := ctx.Param("id")
+    flightID, err := strconv.Atoi(flightIDStr)
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_ID",
+            "errorMessage": "Invalid flight ID format",
+        })
+        return
+    }
+    var req []request.FlightClassRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+        })
+        return
+    }
+
+    result, err := c.flightService.CreateFlightClasses(flightID, req)
+    if err != nil {
+        ctx.JSON(http.StatusInternalServerError, gin.H{
+            "status":       false,
+            "errorCode":    "INTERNAL_ERROR", 
+            "errorMessage": "Failed to create flight classes",
+        })
+        return
+    }
+    
+    statusCode := http.StatusCreated
+    if !result.Status {
+        statusCode = http.StatusBadRequest
+    }
+    
+    ctx.JSON(statusCode, result)
+}
 func (c *FlightController) GetFlightByID(ctx *gin.Context) {
     idStr := ctx.Param("id")
     id, err := strconv.Atoi(idStr)

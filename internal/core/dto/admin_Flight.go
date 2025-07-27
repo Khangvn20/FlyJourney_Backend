@@ -7,15 +7,13 @@ type AdminFlightDetail struct {
     FlightNumber      string                 `json:"flight_number"`
     DepartureAirport  string                 `json:"departure_airport"`
     ArrivalAirport    string                 `json:"arrival_airport"`
-    DepartureTime     time.Time              `json:"departure_time"`
-    ArrivalTime       time.Time              `json:"arrival_time"`
+    DepartureTime     time.Time           `json:"departure_time"`
+    ArrivalTime       time.Time           `json:"arrival_time"`
     DurationMinutes   int                    `json:"duration_minutes"`
     StopsCount        int                    `json:"stops_count"`
     TaxAndFees        float64                `json:"tax_and_fees"`
     TotalSeats        int                    `json:"total_seats"`
     Status            string                 `json:"status"`
-    Gate              string                 `json:"gate"`
-    Terminal          string                 `json:"terminal"`
     Distance          int                    `json:"distance"`
     CreatedAt         time.Time              `json:"created_at"`
     UpdatedAt         time.Time              `json:"updated_at"`
@@ -29,7 +27,10 @@ type AdminFlightClass struct {
     BasePrice        float64   `json:"base_price"`
     AvailableSeats   int       `json:"available_seats"`
     TotalSeats       int       `json:"total_seats"`
-    PackageAvailable string    `json:"package_available,omitempty"`
+    BasePriceChild   float64   `json:"base_price_child,omitempty"` // Optional, can be zero
+    BasePriceInfant  float64   `json:"base_price_infant,omitempty"` //
+    FareClassCode    string    `json:"fare_class_code"`     
+    FareClassDetails  *FareClasses  `json:"fare_class_details"`       // Required field
     CreatedAt        time.Time `json:"created_at"`
     UpdatedAt        time.Time `json:"updated_at"`
 }
