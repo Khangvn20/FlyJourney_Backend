@@ -394,10 +394,13 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
     }
     
     flightClassesQuery := `
-        SELECT flight_class_id, flight_id, class, base_price, available_seats, total_seats, base_price_child, base_price_infant, fare_class_code
-        FROM flight_classes
-        WHERE flight_id = $1
-        ORDER BY base_price ASC
+        SELECT fc.flight_class_id, fc.flight_id, fc.class, fc.base_price, fc.available_seats, 
+               fc.total_seats, fc.base_price_child, fc.base_price_infant, fc.fare_class_code,
+               fcc.fare_class_code,fcc.cabin_class, fcc.refundable, fcc.changeable, fcc.baggage_kg, fcc.description
+        FROM flight_classes fc
+        LEFT JOIN fare_classes fcc ON fc.fare_class_code = fcc.fare_class_code
+        WHERE fc.flight_id = $1
+        ORDER BY fc.base_price ASC
     `
 
     rows, err := r.db.Query(ctx, flightClassesQuery, id)
@@ -410,6 +413,8 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
 
     for rows.Next() {
         var fc dto.FlightClass
+        var fareClass dto.FareClasses
+        
         if err := rows.Scan(
             &fc.FlightClassID,
             &fc.FlightID,
@@ -420,9 +425,16 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
             &fc.BasePriceChild,
             &fc.BasePriceInfant,
             &fc.FareClassCode,
+            &fareClass.FareClassCode,
+            &fareClass.CabinClass,
+            &fareClass.Refundable,
+            &fareClass.Changeable,
+            &fareClass.Baggage_kg,
+            &fareClass.Description,
         ); err != nil {
             return &flight, nil, fmt.Errorf("error scanning flight class: %w", err)
         }
+         fc.FareClassDetails = &fareClass
         flightClasses = append(flightClasses, &fc)
     }
 
@@ -639,6 +651,8 @@ func (r *flightRepository) SearchFlights(
             &result.FlightNumber,
             &result.DepartureAirport,
             &result.ArrivalAirport,
+            &result.DepartureAirportCode,
+            &result.ArrivalAirportCode,       
             &result.DepartureTime,
             &result.ArrivalTime,
             &result.DurationMinutes,
@@ -647,10 +661,13 @@ func (r *flightRepository) SearchFlights(
             &result.Status,
             &result.Distance,
             &result.FlightClass,
-            &result.ClassPrice,
-            &result.ClassAvailability,
             &totalSeats,
-            &result.PackageAvailable,
+            &result.BasePrice,
+            &result.BasePriceChild,
+            &result.BasePriceInfant,
+            &result.FareClassCode,
+            &result.FareClassDetails,
+
         )
         
         if err != nil {
@@ -660,7 +677,7 @@ func (r *flightRepository) SearchFlights(
         if totalSeats.Valid {
             result.TotalSeats = int(totalSeats.Int32)
         }
-        result.TotalPrice = result.ClassPrice + result.TaxAndFees
+        result.TotalPrice = result.BasePrice + result.TaxAndFees
         
         results = append(results, &result)
     }

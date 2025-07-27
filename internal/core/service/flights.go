@@ -198,6 +198,7 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
     }      
     
 }
+
 func (s *flightService) UpdateFlight(flightID int, req *request.UpdateFlightRequest) *response.Response {
 	    existingFlight, flightClasses, err := s.flightRepo.GetByID(flightID)
 
@@ -304,7 +305,6 @@ func (s *flightService) UpdateFlight(flightID int, req *request.UpdateFlightRequ
         existingFlight.ArrivalAiportCode = req.ArrivalAirportCode
     }
 
-    // ✅ VALIDATE THỜI GIAN
     if !existingFlight.ArrivalTime.IsZero() && !existingFlight.DepartureTime.IsZero() {
         if existingFlight.ArrivalTime.Before(existingFlight.DepartureTime) {
             return &response.Response{
@@ -666,7 +666,8 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
     }
 }
 func (s *flightService) GetFlightByIDForUser(flightID int) *response.Response {
-    flight, flightClasses, err := s.flightRepo.GetByID(flightID)
+    flight, flightClasses, err := s.flightRepo.GetByID(flightID)                            // ✅ Debug
+    
     if err != nil {
         return &response.Response{
             Status:       false,
@@ -704,17 +705,21 @@ func (s *flightService) GetFlightByIDForUser(flightID int) *response.Response {
         Distance:         flight.Distance,
         FlightClasses:    make([]*dto.UserFlightClass, 0, len(flightClasses)),
     }
-
         for _, fc := range flightClasses {
         userFlightClass := &dto.UserFlightClass{
             FlightClassID:    fc.FlightClassID,
             Class:            fc.Class,
             BasePrice:        fc.BasePrice,
             AvailableSeats:   fc.AvailableSeats,
-            PackageAvailable: fc.PackageAvailable,
+            BasePriceChild:   fc.BasePriceChild,
+            BasePriceInfant:  fc.BasePriceInfant,
+            FareClassCode:    fc.FareClassCode,
+            FareClassDetails: fc.FareClassDetails, 
         }
         userFlight.FlightClasses = append(userFlight.FlightClasses, userFlightClass)
+
     }
+    
     return &response.Response{
         Status:      true,
         ErrorCode:  error_code.Success,
@@ -765,8 +770,11 @@ func (s *flightService) GetFlightByIDForAdmin(flightID int) *response.Response {
             Class:            fc.Class,
             BasePrice:        fc.BasePrice,
             AvailableSeats:   fc.AvailableSeats,
+            BasePriceChild:   fc.BasePriceChild,
+            BasePriceInfant:  fc.BasePriceInfant,
+            FareClassCode:    fc.FareClassCode,
             TotalSeats:       fc.TotalSeats,
-            PackageAvailable: fc.PackageAvailable,
+            FareClassDetails: fc.FareClassDetails,
             CreatedAt:        fc.CreatedAt,
             UpdatedAt:        fc.UpdatedAt,
         }
