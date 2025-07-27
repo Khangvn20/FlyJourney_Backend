@@ -19,6 +19,7 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
     adminRoutes.Use(authMiddleware, middleware.RequireAdmin())
     {
         adminRoutes.POST("/", flightController.CreateFlight)
+        adminRoutes.PATCH("/:id/status", flightController.UpdateFlightStatus)
         adminRoutes.POST("/:id/classes", flightController.CreateFlightClasses)
         adminRoutes.PUT("/:id", flightController.UpdateFlight)
         adminRoutes.PATCH("/:id", flightController.UpdateFlightStatus)

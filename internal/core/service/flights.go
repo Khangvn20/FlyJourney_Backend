@@ -198,6 +198,7 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
     }      
     
 }
+
 func (s *flightService) UpdateFlight(flightID int, req *request.UpdateFlightRequest) *response.Response {
 	    existingFlight, flightClasses, err := s.flightRepo.GetByID(flightID)
 
@@ -216,7 +217,11 @@ func (s *flightService) UpdateFlight(flightID int, req *request.UpdateFlightRequ
             ErrorMessage: "Not found flight with ID ",
         }
     }
-	if req.FlightNumber != "" && req.FlightNumber != existingFlight.FlightNumber {
+	   if req.AirlineID != 0 {
+        existingFlight.AirlineID = req.AirlineID
+    }
+    
+    if req.FlightNumber != "" && req.FlightNumber != existingFlight.FlightNumber {
         flight, err := s.flightRepo.GetByFlightNumber(req.FlightNumber)
         if err != nil {
             log.Printf("Error checking flight number: %v", err)
@@ -233,8 +238,84 @@ func (s *flightService) UpdateFlight(flightID int, req *request.UpdateFlightRequ
                 ErrorMessage: "Flight number already exists",
             }
         }
+        existingFlight.FlightNumber = req.FlightNumber
     }
-	 updatedFlight, err := s.flightRepo.Update(flightID, existingFlight)
+
+    if req.DepartureAirport != "" {
+        existingFlight.DepartureAirport = req.DepartureAirport
+    }
+    
+    if req.ArrivalAirport != "" {
+        existingFlight.ArrivalAirport = req.ArrivalAirport
+    }
+
+    if req.DepartureTime != "" {
+        departureTime, err := utils.ParseTime(req.DepartureTime)
+        if err != nil {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InvalidRequest,
+                ErrorMessage: "Invalid departure time format",
+            }
+        }
+        existingFlight.DepartureTime = departureTime
+    }
+
+    if req.ArrivalTime != "" {
+        arrivalTime, err := utils.ParseTime(req.ArrivalTime)
+        if err != nil {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InvalidRequest,
+                ErrorMessage: "Invalid arrival time format",
+            }
+        }
+        existingFlight.ArrivalTime = arrivalTime
+    }
+
+    if req.DurationMinutes != 0 {
+        existingFlight.DurationMinutes = req.DurationMinutes
+    }
+
+    if req.StopsCount >= 0 {
+        existingFlight.StopsCount = req.StopsCount
+    }
+
+    if req.TaxAndFees >= 0 {
+        existingFlight.TaxAndFees = req.TaxAndFees
+    }
+
+    if req.Status != "" {
+        existingFlight.Status = req.Status
+    }
+
+    if req.Distance != 0 {
+        existingFlight.Distance = req.Distance
+    }
+
+    if req.Currency != "" {
+        existingFlight.Currency = req.Currency
+    }
+
+    if req.DepartureAirportCode != "" {
+        existingFlight.DepartureAirportCode = req.DepartureAirportCode
+    }
+
+    if req.ArrivalAirportCode != "" {
+        existingFlight.ArrivalAiportCode = req.ArrivalAirportCode
+    }
+
+    if !existingFlight.ArrivalTime.IsZero() && !existingFlight.DepartureTime.IsZero() {
+        if existingFlight.ArrivalTime.Before(existingFlight.DepartureTime) {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InvalidRequest,
+                ErrorMessage: "Arrival time must be after departure time",
+            }
+        }
+    }
+   
+    updatedFlight, err := s.flightRepo.Update(flightID, existingFlight)
     if err != nil {
         log.Printf("Error updating flight: %v", err)
         return &response.Response{
@@ -248,7 +329,7 @@ func (s *flightService) UpdateFlight(flightID int, req *request.UpdateFlightRequ
         Status:       true,
         ErrorCode:    error_code.Success,
         ErrorMessage: "Updated flight successfully",
-       Data: map[string]interface{}{
+        Data: map[string]interface{}{
             "flight":         updatedFlight,
             "flight_classes": flightClasses,
         },
@@ -585,7 +666,8 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
     }
 }
 func (s *flightService) GetFlightByIDForUser(flightID int) *response.Response {
-    flight, flightClasses, err := s.flightRepo.GetByID(flightID)
+    flight, flightClasses, err := s.flightRepo.GetByID(flightID)                            // ✅ Debug
+    
     if err != nil {
         return &response.Response{
             Status:       false,
@@ -623,17 +705,21 @@ func (s *flightService) GetFlightByIDForUser(flightID int) *response.Response {
         Distance:         flight.Distance,
         FlightClasses:    make([]*dto.UserFlightClass, 0, len(flightClasses)),
     }
-
         for _, fc := range flightClasses {
         userFlightClass := &dto.UserFlightClass{
             FlightClassID:    fc.FlightClassID,
             Class:            fc.Class,
             BasePrice:        fc.BasePrice,
             AvailableSeats:   fc.AvailableSeats,
-            PackageAvailable: fc.PackageAvailable,
+            BasePriceChild:   fc.BasePriceChild,
+            BasePriceInfant:  fc.BasePriceInfant,
+            FareClassCode:    fc.FareClassCode,
+            FareClassDetails: fc.FareClassDetails, 
         }
         userFlight.FlightClasses = append(userFlight.FlightClasses, userFlightClass)
+
     }
+    
     return &response.Response{
         Status:      true,
         ErrorCode:  error_code.Success,
@@ -684,8 +770,11 @@ func (s *flightService) GetFlightByIDForAdmin(flightID int) *response.Response {
             Class:            fc.Class,
             BasePrice:        fc.BasePrice,
             AvailableSeats:   fc.AvailableSeats,
+            BasePriceChild:   fc.BasePriceChild,
+            BasePriceInfant:  fc.BasePriceInfant,
+            FareClassCode:    fc.FareClassCode,
             TotalSeats:       fc.TotalSeats,
-            PackageAvailable: fc.PackageAvailable,
+            FareClassDetails: fc.FareClassDetails,
             CreatedAt:        fc.CreatedAt,
             UpdatedAt:        fc.UpdatedAt,
         }

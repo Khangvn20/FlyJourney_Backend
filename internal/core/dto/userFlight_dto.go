@@ -19,5 +19,9 @@ type UserFlightClass struct {
     Class            string  `json:"class"`
     BasePrice        float64 `json:"base_price"`
     AvailableSeats   int     `json:"available_seats"`
-    PackageAvailable string  `json:"package_available,omitempty"`
+    BasePriceChild   float64 `json:"base_price_child,omitempty"`   
+    BasePriceInfant  float64 `json:"base_price_infant,omitempty"` 
+    FareClassCode    string  `json:"fare_class_code"`  
+     FareClassDetails  *FareClasses  `json:"fare_class_details,omitempty"` 
+
 }
