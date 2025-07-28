@@ -9,6 +9,7 @@ import (
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
     "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgxpool"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/utils"
 	"fmt"
 )
 type flightRepository struct {
@@ -562,141 +563,238 @@ func (r *flightRepository) GetByStatus(status string, page, limit int) ([]*dto.F
     return flights, nil
 }
 
+
 func (r *flightRepository) SearchFlights(
     departureAirport string,
-    arrivalAirport string, 
-    departureDate string, 
-    class string, 
-    airlineIDs []int, 
-    maxStops int, 
-    page int, 
+    arrivalAirport string,
+    departureDate string,
+    flightClass string,
+    airlineIDs []int,
+    maxStops int,
+    page int,
     limit int,
     sortBy string,
     sortOrder string,
     forUser bool,
-) ([]*dto.FlightSearchResult, error) {  
+) ([]*dto.FlightSearchResult, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
-   args := []interface{}{
-        departureAirport,
-        arrivalAirport,
-        departureDate,
+
+    offset := (page - 1) * limit
+    parsedDate, err := utils.ParseTime(departureDate)
+    if err != nil {
+        log.Printf("Error parsing departure date: %v", err)
+        return nil, fmt.Errorf("invalid departure date format. Required format: dd/mm/yyyy: %w", err)
     }
-    argIndex := 4
     
-    baseQuery := `
-        SELECT f.flight_id, f.airline_id, a.name as airline_name, f.flight_number,
-               f.departure_airport, f.arrival_airport, f.departure_time, f.arrival_time,
-               f.duration_minutes, f.stops_count, f.tax_and_fees,
-               f.status, f.gate, f.terminal, f.distance,
-               fc.class as flight_class, fc.base_price as class_price,
-               fc.available_seats as class_availability, f.total_seats, fc.package_available
+    // Format date for PostgreSQL DATE comparison (YYYY-MM-DD)
+    formattedDate := parsedDate.Format("2006-01-02")
+    
+    log.Printf("Original date: %s, Parsed date: %s, Formatted for DB: %s", 
+        departureDate, parsedDate.String(), formattedDate)
+
+
+
+    // Base query
+    query := `
+        SELECT 
+            f.flight_id,
+            f.flight_number,
+            f.airline_id,
+            a.name as airline_name,
+            f.departure_airport_code,
+            f.arrival_airport_code,
+            f.departure_airport,
+            f.arrival_airport,
+            f.departure_time,
+            f.arrival_time,
+            f.duration_minutes,
+            f.stops_count,
+            f.distance,
+            fc.class as flight_class,
+            f.total_seats,
+            fc.base_price,
+            fc.base_price_child,
+            fc.base_price_infant,
+            f.tax_and_fees,
+            f.currency,
+            fcc.fare_class_code,
+            fcc.cabin_class,
+            fcc.refundable,
+            fcc.changeable,
+            fcc.baggage_kg,
+            fcc.description
         FROM flights f
-        JOIN flight_classes fc ON f.flight_id = fc.flight_id
-        JOIN airlines a ON f.airline_id = a.airline_id
-        WHERE f.departure_airport = $1
-        AND f.arrival_airport = $2
-        AND f.departure_time LIKE $3 || '%'`
-    if  forUser {
-        baseQuery += " AND f.status = 'scheduled'"
+        INNER JOIN flight_classes fc ON f.flight_id = fc.flight_id
+        LEFT JOIN airlines a ON f.airline_id = a.airline_id
+        LEFT JOIN fare_classes fcc ON fc.fare_class_code = fcc.fare_class_code
+        WHERE f.departure_airport_code = $1
+        AND f.arrival_airport_code = $2
+        AND DATE(f.departure_time) = $3`
+
+
+    args := []interface{}{departureAirport, arrivalAirport, formattedDate}
+    argIndex := 4
+
     
-    }else {
-        baseQuery += " AND f.status IN ('scheduled', 'delayed', 'cancelled')"
-    }
-      baseQuery += fmt.Sprintf(" AND fc.class = $%d", argIndex)
-    args = append(args, class)
-    argIndex++
+    // Add airline filter
     if len(airlineIDs) > 0 {
-        baseQuery += fmt.Sprintf(" AND f.airline_id = ANY($%d::int[])", argIndex)
+        query += fmt.Sprintf(" AND f.airline_id = ANY($%d)", argIndex)
         args = append(args, pq.Array(airlineIDs))
         argIndex++
     }
-     if maxStops >= 0 {
-        baseQuery += fmt.Sprintf(" AND f.stops_count <= $%d", argIndex)
+
+    // Add stops filter
+    if maxStops >= 0 {
+        query += fmt.Sprintf(" AND f.stops_count <= $%d", argIndex)
         args = append(args, maxStops)
         argIndex++
     }
 
-    if sortBy != "" {
-        baseQuery += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
+    // Add status filter for users
+    if forUser {
+        query += " AND f.status IN ('scheduled', 'boarding')"
+        query += " AND fc.available_seats > 0"
+    }
+
+    // Add sorting
+    validSortFields := map[string]string{
+        "departure_time": "f.departure_time",
+        "arrival_time":   "f.arrival_time",
+        "price":          "fc.base_price",
+        "duration":       "f.duration_minutes",
+        "stops":          "f.stops_count",
+    }
+
+    if sortField, ok := validSortFields[sortBy]; ok {
+        if sortOrder == "DESC" || sortOrder == "desc" {
+            query += fmt.Sprintf(" ORDER BY %s DESC", sortField)
+        } else {
+            query += fmt.Sprintf(" ORDER BY %s ASC", sortField)
+        }
     } else {
-        baseQuery += " ORDER BY f.departure_time ASC"
+        query += " ORDER BY f.departure_time ASC"
     }
-    if limit > 0 {
-        offset := (page - 1) * limit
-        baseQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
-        args = append(args, limit, offset)
-    }
-    
-    log.Printf("Executing query: %s with %d args", baseQuery, len(args))
-    rows, err := r.db.Query(ctx, baseQuery, args...)
+
+    // Add pagination
+    query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+    args = append(args, limit, offset)
+
+    log.Printf("Search query: %s", query)
+    log.Printf("Search args: %v", args)
+
+    rows, err := r.db.Query(ctx, query, args...)
     if err != nil {
-        log.Printf("Lỗi khi thực thi truy vấn tìm kiếm chuyến bay: %v", err)
-        return nil, fmt.Errorf("lỗi truy vấn chuyến bay: %w", err)
+        log.Printf("Error searching flights: %v", err)
+        return nil, err
     }
     defer rows.Close()
-    
+
     results := []*dto.FlightSearchResult{}
-    rowCount := 0
-    
+
     for rows.Next() {
-        rowCount++
         var result dto.FlightSearchResult
-        var totalSeats sql.NullInt32
-        
+        var fareClass dto.FareClasses
+        var airlineName sql.NullString
+        var fareClassCode, cabinClass, baggageKg, description sql.NullString
+        var refundable, changeable sql.NullBool
+
         err := rows.Scan(
             &result.FlightID,
-            &result.AirlineID,
-            &result.AirlineName,
             &result.FlightNumber,
+            &result.AirlineID,
+            &airlineName,
+            &result.DepartureAirportCode,
+            &result.ArrivalAirportCode,
             &result.DepartureAirport,
             &result.ArrivalAirport,
-            &result.DepartureAirportCode,
-            &result.ArrivalAirportCode,       
             &result.DepartureTime,
             &result.ArrivalTime,
-            &result.DurationMinutes,
+            &result.Duration,
             &result.StopsCount,
-            &result.TaxAndFees,
-            &result.Status,
             &result.Distance,
             &result.FlightClass,
-            &totalSeats,
-            &result.BasePrice,
-            &result.BasePriceChild,
-            &result.BasePriceInfant,
-            &result.FareClassCode,
-            &result.FareClassDetails,
-
+            &result.TotalSeats,
+            &result.Pricing.BasePrices.Adult,
+            &result.Pricing.BasePrices.Child,
+            &result.Pricing.BasePrices.Infant,
+            &result.TaxAndFees,
+            &result.Pricing.Currency,
+            &fareClassCode,
+            &cabinClass,
+            &refundable,
+            &changeable,
+            &baggageKg,
+            &description,
         )
-        
         if err != nil {
-            log.Printf("Lỗi khi quét dữ liệu chuyến bay: %v", err)
-            continue 
+            log.Printf("Error scanning flight search result: %v", err)
+            return nil, err
         }
-        if totalSeats.Valid {
-            result.TotalSeats = int(totalSeats.Int32)
+
+        // Set airline name
+        if airlineName.Valid {
+            result.AirlineName = airlineName.String
         }
-        result.TotalPrice = result.BasePrice + result.TaxAndFees
-        
+        if fareClassCode.Valid {
+            fareClass.FareClassCode = fareClassCode.String
+            fareClass.CabinClass = cabinClass.String
+            fareClass.Refundable = refundable.Bool
+            fareClass.Changeable = changeable.Bool
+            fareClass.Baggage_kg = baggageKg.String
+            fareClass.Description = description.String
+            result.FareClassDetails = &fareClass
+        }
+
+        // Set fare class details
+        if fareClassCode.Valid {
+            fareClass.FareClassCode = fareClassCode.String
+            fareClass.CabinClass = cabinClass.String
+            fareClass.Refundable = refundable.Bool
+            fareClass.Changeable = changeable.Bool
+            fareClass.Baggage_kg = baggageKg.String
+            fareClass.Description = description.String
+            result.FareClassDetails = &fareClass
+        }
+
+        // ✅ Calculate taxes and prices for adults (always required)
+        adultTax := result.TaxAndFees
+        result.Pricing.Taxes.Adult = adultTax
+        result.Pricing.TotalPrices.Adult = result.Pricing.BasePrices.Adult + adultTax
+
+        // ✅ Only calculate child pricing if child base price > 0
+        if result.Pricing.BasePrices.Child > 0 {
+            childTax := result.TaxAndFees * 0.75 // 75% of adult tax
+            result.Pricing.Taxes.Child = childTax
+            result.Pricing.TotalPrices.Child = result.Pricing.BasePrices.Child + childTax
+        }
+
+        // ✅ Only calculate infant pricing if infant base price > 0  
+        if result.Pricing.BasePrices.Infant > 0 {
+            infantTax := result.TaxAndFees * 0.25 // 25% of adult tax
+            result.Pricing.Taxes.Infant = infantTax
+            result.Pricing.TotalPrices.Infant = result.Pricing.BasePrices.Infant + infantTax
+        }
+
+        // Calculate grand total (for 1 adult by default - service sẽ override)
+        result.Pricing.GrandTotal = result.Pricing.TotalPrices.Adult
+
         results = append(results, &result)
     }
-    
     if err := rows.Err(); err != nil {
-        log.Printf("Lỗi khi lặp qua kết quả tìm kiếm: %v", err)
-        return nil, fmt.Errorf("lỗi khi lặp qua chuyến bay: %w", err)
+        log.Printf("Error iterating flight search results: %v", err)
+        return nil, err
     }
-    
-    log.Printf("Tìm thấy %d chuyến bay phù hợp", len(results))
+
     return results, nil
 }
 func (r *flightRepository) Count() (int, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    var count int
     query := `SELECT COUNT(*) FROM flights`
-
+    
+    var count int
     err := r.db.QueryRow(ctx, query).Scan(&count)
     if err != nil {
         log.Printf("Error counting flights: %v", err)
@@ -706,23 +804,35 @@ func (r *flightRepository) Count() (int, error) {
     return count, nil
 }
 
-func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string, departureDate string, forUser bool,) (int, error) {
+func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string, departureDate string, forUser bool) (int, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-     query := `
+    // Parse and format departure date for database query
+    parsedDate, err := utils.ParseTime(departureDate)
+    if err != nil {
+        log.Printf("Error parsing departure date: %v", err)
+        return 0, fmt.Errorf("invalid departure date format: %w", err)
+    }
+    
+    // Format date for PostgreSQL DATE comparison
+    formattedDate := parsedDate.Format("2006-01-02")
+
+    query := `
         SELECT COUNT(*)
         FROM flights f
         JOIN flight_classes fc ON f.flight_id = fc.flight_id
-        WHERE f.departure_airport = $1
-        AND f.arrival_airport = $2
-        AND f.departure_time LIKE $3 || '%'`
+        WHERE f.departure_airport_code = $1
+        AND f.arrival_airport_code = $2
+        AND DATE(f.departure_time) = $3`
 
-     if forUser {
-        query += " AND f.status = 'scheduled'"
+    if forUser {
+        query += " AND f.status IN ('scheduled', 'boarding')"
+        query += " AND fc.available_seats > 0"
     }
+
     var count int
-    err := r.db.QueryRow(ctx, query, departureAirport, arrivalAirport, departureDate).Scan(&count)
+    err = r.db.QueryRow(ctx, query, departureAirport, arrivalAirport, formattedDate).Scan(&count)
     if err != nil {
         log.Printf("Error counting flights by search: %v", err)
         return 0, err
@@ -730,7 +840,6 @@ func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string
 
     return count, nil
 }
-
 func (r *flightRepository) UpdateStatus(id int, status string) error {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()

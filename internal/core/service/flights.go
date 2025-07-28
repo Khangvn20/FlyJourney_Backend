@@ -39,7 +39,11 @@ func (s *flightService) CreateFlightClasses(flightID int, req []request.FlightCl
                 ErrorMessage: "Total seats for each flight class must be greater than zero",
             }, nil
         }
-
+        
+        infantPrice := float64(0)
+        if fcReq.BasePriceInfant != nil {
+            infantPrice = *fcReq.BasePriceInfant
+        }
         flightClasses = append(flightClasses, &dto.FlightClass{
             FlightID:         flightID,
             Class:            fcReq.Class,
@@ -48,7 +52,7 @@ func (s *flightService) CreateFlightClasses(flightID int, req []request.FlightCl
             AvailableSeats:   fcReq.AvailableSeats,
             TotalSeats:       fcReq.TotalSeats,
             BasePriceChild:   fcReq.BasePriceChild,
-            BasePriceInfant:  fcReq.BasePriceInfant,
+            BasePriceInfant: infantPrice,
         })
     }
 
@@ -166,6 +170,12 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
     }
     flightClasses := make([]*dto.FlightClass, 0, len(req.FlightClasses))
     for _, fcReq := range req.FlightClasses {
+         totalSeats += fcReq.TotalSeats
+           infantPrice := float64(0)
+        if fcReq.BasePriceInfant != nil {
+            infantPrice = *fcReq.BasePriceInfant
+        }
+        
         flightClasses = append(flightClasses, &dto.FlightClass{
             FlightID:       createdFlight.FlightID, 
             Class:          fcReq.Class,
@@ -173,7 +183,7 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
             AvailableSeats: fcReq.AvailableSeats,
             TotalSeats:     fcReq.TotalSeats,
             BasePriceChild: fcReq.BasePriceChild,
-            BasePriceInfant: fcReq.BasePriceInfant,
+            BasePriceInfant: infantPrice,
             FareClassCode:  fcReq.FareClassCode,
         })
     }
@@ -399,7 +409,28 @@ func (s *flightService) GetAllFlights(page , limit int) *response.Response {
 	}
 }
 func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *response.Response {
-   
+    // Validate and parse departure date
+    _, err := utils.ParseTime(req.DepartureDate)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid departure date format. Supported formats: dd/mm/yyyy, yyyy-mm-dd, dd/mm/yyyy HH:mm",
+        }
+    }
+
+    // Validate and parse arrival date if provided
+    if req.ArrivalDate != "" {
+        _, err := utils.ParseTime(req.ArrivalDate)
+        if err != nil {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InvalidRequest,
+                ErrorMessage: "Invalid arrival date format. Supported formats: dd/mm/yyyy, yyyy-mm-dd, dd/mm/yyyy HH:mm",
+            }
+        }
+    }
+
     var airlineIDs []int
     if req.AirlineIDs != nil {
         airlineIDs = req.AirlineIDs
@@ -430,9 +461,10 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
     if req.SortOrder != "" {
         sortOrder = req.SortOrder
     }
+    
     flights, err := s.flightRepo.SearchFlights(
-        req.DepartureAirport,
-        req.ArrivalAirport,
+        req.DepartureAirportCode,
+        req.ArrivalAirportCode,
         req.DepartureDate,
         req.FlightClass,
         airlineIDs,
@@ -454,8 +486,8 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
     }
     
     totalCount, err := s.flightRepo.CountBySearch(
-        req.DepartureAirport,
-        req.ArrivalAirport,
+        req.DepartureAirportCode,
+        req.ArrivalAirportCode,
         req.DepartureDate,
         false, // For admin search, we don't filter by status
     )
@@ -472,15 +504,157 @@ func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *respons
         ErrorCode:    error_code.Success,
         ErrorMessage: "Successfully searched flights",
         Data: map[string]interface{}{
-            "flights":           flights,
+            "search_results":    flights, // Changed from "flights" to "search_results"
             "total_count":       totalCount,
             "total_pages":       totalPages,
             "page":              page,
             "limit":             limit,
-            "departure_airport": req.DepartureAirport,
-            "arrival_airport":   req.ArrivalAirport,
+            "departure_airport": req.DepartureAirportCode,
+            "arrival_airport":   req.ArrivalAirportCode,
             "departure_date":    req.DepartureDate,
+            "arrival_date":      req.ArrivalDate,
             "flight_class":      req.FlightClass,
+            "sort_by":           sortBy,
+            "sort_order":        sortOrder,
+        },
+    }
+}
+func (s *flightService) SearchFlightsForUser(req *request.FlightSearchRequest) *response.Response {
+    // Validate and parse departure date
+    _, err := utils.ParseTime(req.DepartureDate)
+    if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid departure date format. Supported formats: dd/mm/yyyy, yyyy-mm-dd, dd/mm/yyyy HH:mm",
+        }
+    }
+
+
+    // Validate and parse arrival date if provided
+    if req.ArrivalDate != "" {
+        _, err := utils.ParseTime(req.ArrivalDate)
+        if err != nil {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InvalidRequest,
+                ErrorMessage: "Invalid arrival date format. Supported formats: dd/mm/yyyy, yyyy-mm-dd, dd/mm/yyyy HH:mm",
+            }
+        }
+    }
+
+    var airlineIDs []int
+    if req.AirlineIDs != nil {
+        airlineIDs = req.AirlineIDs
+    }
+
+    maxStops := -1
+    if req.MaxStops >= 0 {
+        maxStops = req.MaxStops
+    }
+
+    page := 1
+    if req.Page > 0 {
+        page = req.Page
+    }
+
+    limit := 10
+    if req.Limit > 0 {
+        limit = req.Limit
+    }
+
+    sortBy := "departure_time"
+    if req.SortBy != "" {
+        sortBy = req.SortBy
+    }
+
+    sortOrder := "ASC"
+    if req.SortOrder != "" {
+        sortOrder = req.SortOrder
+    }
+
+    flights, err := s.flightRepo.SearchFlights(
+        req.DepartureAirportCode,
+        req.ArrivalAirportCode,
+        req.DepartureDate,
+        req.FlightClass,
+        airlineIDs,
+        maxStops,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        true, // forUser = true
+    )
+
+    if err != nil {
+        log.Printf("Error searching flights for user: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Failed to search flights",
+        }
+    }
+
+    for _, flight := range flights {
+        passengers := req.Passengers
+        
+        // Always calculate adult cost (minimum 1 adult required)
+        totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+        
+        var totalChildCost, totalInfantCost float64
+        
+        if passengers.Children > 0 {
+            totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+        } else {
+            // Clear child data if not needed
+            flight.Pricing.BasePrices.Child = 0
+            flight.Pricing.TotalPrices.Child = 0
+            flight.Pricing.Taxes.Child = 0
+        }
+    
+        if passengers.Infants > 0 {
+            totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+        } else {
+
+            flight.Pricing.BasePrices.Infant = 0
+            flight.Pricing.TotalPrices.Infant = 0
+            flight.Pricing.Taxes.Infant = 0
+        }
+        
+        flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+    }
+
+    totalCount, err := s.flightRepo.CountBySearch(
+        req.DepartureAirportCode,
+        req.ArrivalAirportCode,
+        req.DepartureDate,
+        true, // forUser = true
+    )
+    
+    if err != nil {
+        log.Printf("Error counting flights for user: %v", err)
+        totalCount = len(flights)
+    }
+
+    totalPages := (totalCount + limit - 1) / limit
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully searched flights for user",
+        Data: map[string]interface{}{
+            "search_results":    flights, // Using FlightSearchResult struct
+            "total_count":       totalCount,
+            "total_pages":       totalPages,
+            "page":              page,
+            "limit":             limit,
+            "departure_airport": req.DepartureAirportCode,
+            "arrival_airport":   req.ArrivalAirportCode,
+            "departure_date":    req.DepartureDate,
+            "arrival_date":      req.ArrivalDate,
+            "flight_class":      req.FlightClass,
+             "passengers":        req.Passengers,
             "sort_by":           sortBy,
             "sort_order":        sortOrder,
         },
@@ -787,82 +961,7 @@ func (s *flightService) GetFlightByIDForAdmin(flightID int) *response.Response {
         Data:         adminFlight,
     }
 }
-func (s *flightService) SearchFlightsForUser(req *request.FlightSearchRequest) *response.Response {
-    var airlineIDs []int
-    if req.AirlineIDs != nil {
-        airlineIDs = req.AirlineIDs
-    }
-    maxStops := -1
-    if req.MaxStops >= 0 {
-        maxStops = req.MaxStops
-    }
-    page :=1
-    if req.Page > 0 {
-        page = req.Page
-    }
-    limit :=10
-    if req.Limit > 0 {
-        limit = req.Limit
-    }
-    sortBy := "departure_time"
-    if req.SortBy != "" {
-        sortBy = req.SortBy
-    }
-    sortOrder := "ASC"
-    if req.SortOrder != "" {
-        sortOrder = req.SortOrder
-    }
-    flights, err := s.flightRepo.SearchFlights(
-        req.DepartureAirport,
-        req.ArrivalAirport,
-        req.DepartureDate,
-        req.FlightClass,
-        airlineIDs,
-        maxStops,
-        page,
-        limit,
-        sortBy,
-        sortOrder,
-        true,
-    )
-    if err != nil {
-        log.Printf("Error searching flights: %v", err)
-        return &response.Response{
-            Status:      false,
-            ErrorCode:   error_code.InternalError,
-            ErrorMessage: "Error searching flights",
-        }
-    }
-    totalCount, err := s.flightRepo.CountBySearch(
-        req.DepartureAirport,
-        req.ArrivalAirport,
-        req.DepartureDate,
-        true,
-    )
-    if err != nil {
-        log.Printf("Error counting flights: %v", err)
-        totalCount = len(flights)
-    }
-    totalCountPages := (totalCount + limit - 1) / limit
-    return &response.Response{
-        Status:       true,
-        ErrorCode:    error_code.Success,
-        ErrorMessage: "Successfully searched flights for user",
-        Data: map[string]interface{}{
-            "flights":           flights,
-            "total_count":       totalCount,
-            "total_pages":       totalCountPages,
-            "page":              page,
-            "limit":             limit,
-            "departure_airport": req.DepartureAirport,
-            "arrival_airport":   req.ArrivalAirport,
-            "departure_date":    req.DepartureDate,
-            "flight_class":      req.FlightClass,
-            "sort_by":           sortBy,
-            "sort_order":        sortOrder,
-        },
-    }
-}
+
 func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlightSearchRequest) *response.Response {
     var airlineIDs []int
     if req.AirlineIDs != nil {
