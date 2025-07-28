@@ -25,7 +25,7 @@ type FlightClassRequest struct {
     FareClassCode string `json:"fare_class_code" binding:"required"`
     BasePrice      float64 `json:"base_price" binding:"required"`
     AvailableSeats int     `json:"available_seats" binding:"required"`
-    BasePriceInfant float64 `json:"base_price_infant" binding:"required"` // Optional, can be zero
+    BasePriceInfant *float64 `json:"base_price_infant" binding:"required"` // Optional, can be zero
     BasePriceChild float64 `json:"base_price_child" binding:"required"`
     TotalSeats     int     `json:"total_seats" binding:"required"`
 }

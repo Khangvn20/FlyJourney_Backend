@@ -18,12 +18,6 @@ func ParseTime(dateStr string) (time.Time, error) {
     formats := []string{
         "02/01/2006 15:04",       // dd/mm/yyyy HH:mm
         "02/01/2006",             // dd/mm/yyyy
-        "02-01-2006 15:04",       // dd-mm-yyyy HH:mm  
-        "02-01-2006",             // dd-mm-yyyy
-        "2006-01-02 15:04:05",    // yyyy-mm-dd HH:mm:ss (original format)
-        "2006-01-02T15:04:05Z",   // ISO 8601
-        "2006-01-02 15:04",       // yyyy-mm-dd HH:mm
-        "2006-01-02",             // yyyy-mm-dd
     }
     
     for _, format := range formats {
