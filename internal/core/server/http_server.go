@@ -32,7 +32,7 @@ func NewHTTPServer(port int) (*Server, error) {
     r:=gin.Default()
      r.Use(func(c *gin.Context) {
         origin := c.Request.Header.Get("Origin")
-        allowedOrigins := []string{"http://localhost:5173", "http://localhost:5555"}
+        allowedOrigins := []string{"http://localhost:3030", "http://localhost:5555"}
 
         for _, allowedOrigin := range allowedOrigins {
             if origin == allowedOrigin {
