@@ -307,6 +307,7 @@ func (s *userService) Logout(tokenString string) *response.Response {
     }
 }
 func (s *userService) GetUserInfo(userID int) *response.Response {
+    
     user, err := s.userRepo.GetUserByID(userID)
     if err != nil {
         return &response.Response{
@@ -329,7 +330,40 @@ func (s *userService) GetUserInfo(userID int) *response.Response {
         Data:         user, 
     }
 }
-// Fix the UpdateProfile method where the error is occurring
+func (s *userService) GetAllUsers(page, limit int) (*response.Response, error) {
+    if page <= 0 {
+        page = 1
+    }
+    if limit <= 0 {
+        limit = 10
+    }
+    if limit > 100 {
+        limit = 100
+    }
+    users, err := s.userRepo.GetAllUser(page, limit)
+    if err != nil {
+        return nil, err
+    }
+    
+    totalCount, err := s.userRepo.CountUsers()
+    if err != nil {
+        log.Printf("Error counting users: %v", err)
+        totalCount = len(users)
+    }
+    
+    totalPages := (totalCount + limit - 1) / limit
+    
+    return &response.Response{
+        Status: true,
+        Data: map[string]interface{}{
+            "users":       users,
+            "total_count": totalCount,
+            "total_pages": totalPages,
+            "page":        page,
+            "limit":       limit,
+        },
+    }, nil
+}
 
 func (s *userService) UpdateProfile(userID int, req *request.UpdateProfileRequest) *response.Response {
     existingUser, err := s.userRepo.GetUserByID(userID)

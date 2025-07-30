@@ -19,7 +19,58 @@ type userRepository struct {
 func NewUserRepository(db coreRepo.Database) coreRepo.UserRepository {
 	return &userRepository{db: db.GetPool()}
 }
-
+func (r *userRepository) GetAllUser(page, limit int) ([]*dto.User, error) {
+    var users []*dto.User
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    query := `SELECT user_id, email, name, phone, roles, created_at, updated_at, last_login 
+              FROM users`
+    if page > 0 && limit > 0 {
+        offset := (page - 1) * limit
+        query += fmt.Sprintf(" ORDER BY user_id LIMIT %d OFFSET %d", limit, offset)
+    } else {
+        query += " ORDER BY user_id"
+    }
+    rows, err := r.db.Query(ctx, query)
+    if err != nil {
+        log.Printf("Error querying users: %v", err)
+        return nil, err
+    }
+    defer rows.Close()
+    for rows.Next() {
+        var user dto.User
+        var lastLogin *time.Time
+        var roles string
+        err = rows.Scan(&user.UserID, &user.Email, &user.Name, &user.Phone, &roles, &user.CreatedAt, &user.UpdatedAt, &lastLogin)
+        if err != nil {
+            log.Printf("Error scanning user row: %v", err)
+            return nil, err
+        }
+        user.Roles = dto.UserRole(roles)
+        user.LastLogin = lastLogin
+        users = append(users, &user)
+    }
+    if err = rows.Err(); err != nil {
+        log.Printf("Error iterating over user rows: %v", err)
+        return nil, err
+    }
+    return users, nil
+}
+func (r *userRepository) CountUsers() (int, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    query := `SELECT COUNT(*) FROM users`
+    
+    var count int
+    err := r.db.QueryRow(ctx, query).Scan(&count)
+    if err != nil {
+        log.Printf("Error counting users: %v", err)
+        return 0, err
+    }
+    
+    return count, nil
+}
 func (r *userRepository) FindByEmail(email string) (*dto.User, error) {
       query := `
         SELECT 

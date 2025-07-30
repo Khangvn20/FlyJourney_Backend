@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -147,6 +148,36 @@ func (c *UserController) GetUserInfo(ctx *gin.Context) {
 	}
 
 	ctx.JSON(statusCode, result)
+}
+func (c *UserController) GetAllUsers(ctx *gin.Context) {
+	pageStr := ctx.Query("page")
+	limitStr := ctx.Query("limit")
+
+	page, limit := 1, 10 
+	if pageStr != "" {
+		var err error
+		page, err = strconv.Atoi(pageStr)
+		if err != nil || page < 1 {
+			ctx.JSON(400, gin.H{"status": false, "errorMessage": "Invalid page number"})
+			return
+		}
+	}
+	if limitStr != "" {
+		var err error
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil || limit < 1 || limit > 100 {
+			ctx.JSON(400, gin.H{"status": false, "errorMessage": "Invalid limit number"})
+			return
+		}
+	}
+
+	result, err := c.userService.GetAllUsers(page, limit)
+	if err != nil {
+		ctx.JSON(500, gin.H{"status": false, "errorMessage": "Internal server error"})
+		return
+	}
+
+	ctx.JSON(200, result)
 }
 func (c *UserController) UpdateProfile(ctx *gin.Context) {
 	userID, exists := ctx.Get("userID")
