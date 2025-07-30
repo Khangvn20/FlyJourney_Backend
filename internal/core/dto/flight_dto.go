@@ -18,6 +18,7 @@ type Flight struct {
     Status            string    `json:"status"`
     Currency          string    `json:"currency"`
     Distance          int       `json:"distance"`
+    FlightClasses []*FlightClass `json:"flight_classes,omitempty"`
     CreatedAt         time.Time `json:"created_at"`
     UpdatedAt         time.Time `json:"updated_at"`
 }

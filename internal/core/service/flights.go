@@ -375,38 +375,68 @@ func (s *flightService) GetFlightByID(id int) *response.Response {
         },
     }
 }
-func (s *flightService) GetAllFlights(page , limit int) *response.Response {
-	flights ,err := s.flightRepo.GetAll(page, limit)
-	if err != nil {
-		log.Printf("Error getting flights: %v", err)
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
-	totalCount, err := s.flightRepo.Count()
-	if err != nil {
-		log.Printf("Error counting flights: %v", err)
-		return &response.Response{
-			Status:       false,
-			ErrorCode:    error_code.InternalError,
-			ErrorMessage: error_code.InternalErrMsg,
-		}
-	}
-	totalPages := (totalCount + limit - 1) / limit
-	return &response.Response{
-		Status:       true,
-		ErrorCode:    error_code.Success,
-		ErrorMessage: "Successfully retrieved flights",
-		  Data: map[string]interface{}{
-            "flights":     flights,
+func (s *flightService) GetAllFlights(page, limit int) *response.Response {
+    flights, err := s.flightRepo.GetAll(page, limit)
+    if err != nil {
+        log.Printf("Error getting flights: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+
+    totalCount, err := s.flightRepo.Count()
+    if err != nil {
+        log.Printf("Error counting flights: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: error_code.InternalErrMsg,
+        }
+    }
+
+    totalPages := (totalCount + limit - 1) / limit
+    flightData := make([]map[string]interface{}, 0, len(flights))
+    
+    for _, flight := range flights {
+        flightInfo := map[string]interface{}{
+            "flight_id":               flight.FlightID,
+            "airline_id":              flight.AirlineID,
+            "flight_number":           flight.FlightNumber,
+            "departure_airport":       flight.DepartureAirport,
+            "arrival_airport":         flight.ArrivalAirport,
+            "departure_time":          flight.DepartureTime,
+            "arrival_time":            flight.ArrivalTime,
+            "duration_minutes":        flight.DurationMinutes,
+            "stops_count":             flight.StopsCount,
+            "tax_and_fees":            flight.TaxAndFees,
+            "total_seats":             flight.TotalSeats,
+            "status":                  flight.Status,
+            "distance":                flight.Distance,
+            "departure_airport_code":  flight.DepartureAirportCode,
+            "arrival_airport_code":    flight.ArrivalAiportCode,
+            "currency":                flight.Currency,
+            "created_at":              flight.CreatedAt,
+            "updated_at":              flight.UpdatedAt,
+        }
+      
+
+        flightData = append(flightData, flightInfo)
+    }
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully retrieved flights",
+        Data: map[string]interface{}{
+            "flights":     flightData,
             "total_count": totalCount,
             "page":        page,
             "limit":       limit,
             "total_pages": totalPages,
         },
-	}
+    }
 }
 func (s *flightService) SearchFlights(req *request.FlightSearchRequest) *response.Response {
     // Validate and parse departure date

@@ -133,9 +133,10 @@ func (r *flightRepository) GetAll(page, limit int) ([]*dto.Flight, error) {
     offset := (page - 1) * limit
 
     query := `
-        SELECT flight_id, airline_id, aircraft_id, flight_number, departure_airport, arrival_airport,
+        SELECT flight_id, airline_id, flight_number, departure_airport, arrival_airport,
                departure_time, arrival_time, duration_minutes, stops_count, tax_and_fees,
-               total_seats, status, gate, terminal, distance, created_at, updated_at
+               total_seats, status, distance, departure_airport_code, arrival_airport_code,
+               currency, created_at, updated_at
         FROM flights
         ORDER BY departure_time
         LIMIT $1 OFFSET $2
@@ -155,7 +156,6 @@ func (r *flightRepository) GetAll(page, limit int) ([]*dto.Flight, error) {
         err := rows.Scan(
             &flight.FlightID,
             &flight.AirlineID,
-         
             &flight.FlightNumber,
             &flight.DepartureAirport,
             &flight.ArrivalAirport,
@@ -167,6 +167,9 @@ func (r *flightRepository) GetAll(page, limit int) ([]*dto.Flight, error) {
             &flight.TotalSeats,
             &flight.Status,
             &flight.Distance,
+            &flight.DepartureAirportCode,
+            &flight.ArrivalAiportCode,
+            &flight.Currency,
             &flight.CreatedAt,
             &flight.UpdatedAt,
         )
@@ -174,12 +177,8 @@ func (r *flightRepository) GetAll(page, limit int) ([]*dto.Flight, error) {
             log.Printf("Error scanning flight row: %v", err)
             return nil, err
         }
-        flights = append(flights, &flight)
-    }
 
-    if err := rows.Err(); err != nil {
-        log.Printf("Error iterating flight rows: %v", err)
-        return nil, err
+        flights = append(flights, &flight)
     }
 
     return flights, nil
