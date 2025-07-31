@@ -8,6 +8,8 @@ type UserRepository interface {
 	Create(user *dto.User) (*dto.User, error)
 	UpdatePassword(userID int, newPassword string) error
 	GetUserByID(userID int) (*dto.User, error)
+	GetAllUser(page, limit int) ([]*dto.User, error)
 	UpdateProfile(userID int, user *dto.User) (*dto.User, error)
 	FindByPhone(phone string) (*dto.User, error)
+	CountUsers() (int, error)
 }

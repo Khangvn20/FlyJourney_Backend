@@ -8,7 +8,7 @@ import (
 func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightController, authMiddleware gin.HandlerFunc) {
     flightRoutes := rg.Group("/flights")
     {
-		flightRoutes.GET("/", flightController.GetAllFlights)
+		
         flightRoutes.GET("/:id", flightController.GetFlightByIDForUser)
         flightRoutes.GET("/airline/:airline_id", flightController.GetFlightsByAirline)
         flightRoutes.GET("/status/:status", flightController.GetFlightsByStatus)
@@ -18,6 +18,7 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
     adminRoutes :=rg.Group("/admin/flights")
     adminRoutes.Use(authMiddleware, middleware.RequireAdmin())
     {
+        adminRoutes.GET("/", flightController.GetAllFlights)
         adminRoutes.POST("/", flightController.CreateFlight)
         adminRoutes.PATCH("/:id/status", flightController.UpdateFlightStatus)
         adminRoutes.POST("/:id/classes", flightController.CreateFlightClasses)

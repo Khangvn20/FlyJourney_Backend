@@ -1,29 +1,24 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: flyjourney_postgres
     environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: vnvk090123
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: ${DB_Name}
+      POSTGRES_USER: ${DB_User}
+      POSTGRES_PASSWORD: ${DB_Pass}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql # Optional: for initial schema
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - flyjourney_network
     restart: unless-stopped
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: flyjourney_redis
-    command: redis-server --requirepass khang090123
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
       - "6379:6379"
     volumes:
@@ -32,68 +27,47 @@ services:
       - flyjourney_network
     restart: unless-stopped
 
-  # Go Application
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    image: vikhang21/fly_journey:1.0.0
     container_name: flyjourney_backend
     environment:
-      # Database config
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: postgres
-      DB_USER: postgres
-      DB_PASS: vnvk090123
-      
-      # Redis config
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: khang090123
-      
-      # JWT Secret
-      JWT_SECRET: 123456789
-      
-      # Email config
-      EMAIL_USER: khangvnv.125010122030@vtc.edu.vn
-      PASSWORD_USER: "khee tmkp efej essx"
-      EMAIL_HOST: smtp.gmail.com
-      EMAIL_PORT: 587
-      
-      # Twilio config
-      ACCOUNT_SID: AC8fef7600402d85d5e84050fb7ee923bd
-      AUTH_TOKEN: d3a1417440b0e91056041de1b469aacf
-      TWILIO_PHONE: "+17433563419"
-      
-      # App config
+      DB_HOST: ${DB_Host}      
+      DB_PORT: ${DB_Port}     
+      DB_NAME: ${DB_Name}
+      DB_USER: ${DB_User}
+      DB_PASS: ${DB_Pass}
+      REDIS_HOST: redis            
+      REDIS_PORT: 6379            
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      EMAIL_USER: ${email_user}
+      PASSWORD_USER: ${password_user}
+      EMAIL_HOST: ${email_host}
+      EMAIL_PORT: ${email_port}
+      ACCOUNT_SID: ${account_SID}
+      AUTH_TOKEN: ${auth_token}
+      TWILIO_PHONE: ${twilio_phone}
       GIN_MODE: release
       PORT: 3000
     ports:
-      - "3000:3000"  # Thay đổi từ 8080:8080 sang 3000:3000
+      - "3000:3000"
     depends_on:
-      - postgres
       - redis
+      - postgres
     networks:
       - flyjourney_network
     restart: unless-stopped
     volumes:
-      - ./logs:/root/logs # Optional: for log files
-
-  # Adminer (Database management tool - optional)
-  adminer:
-    image: adminer:latest
-    container_name: flyjourney_adminer
-    ports:
-      - "8081:8080"
-    depends_on:
-      - postgres
-    networks:
-      - flyjourney_network
-    restart: unless-stopped
+      - ./logs:/root/logs
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
 
 networks:
   flyjourney_network:
