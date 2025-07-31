@@ -42,7 +42,6 @@ services:
       REDIS_HOST: redis            
       REDIS_PORT: 6379            
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      
       JWT_SECRET: ${JWT_SECRET}
       EMAIL_USER: ${email_user}
       PASSWORD_USER: ${password_user}
@@ -64,10 +63,25 @@ services:
     volumes:
       - ./logs:/root/logs
 
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: flyjourney_jenkins
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - flyjourney_network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  jenkins_home:
     driver: local
 
 networks:
