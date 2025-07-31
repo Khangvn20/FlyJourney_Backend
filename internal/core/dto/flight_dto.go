@@ -42,6 +42,7 @@ type FlightSearchResult struct {
     FlightNumber         string `json:"flight_number"`
     AirlineID           int    `json:"airline_id"`
     AirlineName         string `json:"airline_name"`
+    AirlineLogo         string `json:"logo_url"` // Optional field for airline logo URL
     
     // Airport & Time info
     DepartureAirportCode string `json:"departure_airport_code"`
