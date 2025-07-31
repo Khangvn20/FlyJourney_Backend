@@ -601,6 +601,7 @@ func (r *flightRepository) SearchFlights(
             f.flight_number,
             f.airline_id,
             a.name as airline_name,
+            a.logo_url as airline_logo_url,
             f.departure_airport_code,
             f.arrival_airport_code,
             f.departure_airport,
@@ -703,6 +704,7 @@ func (r *flightRepository) SearchFlights(
             &result.FlightNumber,
             &result.AirlineID,
             &airlineName,
+            &result.AirlineLogo,
             &result.DepartureAirportCode,
             &result.ArrivalAirportCode,
             &result.DepartureAirport,
@@ -861,7 +863,7 @@ func (r *flightRepository) SearchRoundtripFlights(
     departureAirport string,
     arrivalAirport string,
     departureDate string,
-    returnDate string ,
+    returnDate string,
     class string,
     airlineIDs []int,
     maxStops int,
@@ -869,13 +871,13 @@ func (r *flightRepository) SearchRoundtripFlights(
     limit int,
     sortBy string,
     sortOrder string,
+    forUser bool,
 ) (*dto.RoundtripSearchResult, error) {
-
-    log.Printf("Tìm kiếm chuyến bay một chiều: từ %s đến %s vào ngày %s, hạng ghế: %s", 
-        departureAirport, arrivalAirport, departureDate, class)
-
-
-        outboundFlights, err := r.SearchFlights(
+    log.Printf("Searching round-trip flights: from %s to %s, departure date: %s, return date: %s, class: %s",
+        departureAirport, arrivalAirport, departureDate, returnDate, class)
+    
+    // Get outbound flights
+    outboundFlights, err := r.SearchFlights(
         departureAirport,
         arrivalAirport,
         departureDate,
@@ -886,13 +888,15 @@ func (r *flightRepository) SearchRoundtripFlights(
         limit,
         sortBy,
         sortOrder,
-        false,
+        forUser,
     )
-        if err != nil {
-            log.Printf("Lỗi khi tìm kiếm chuyến bay đi: %v", err)
-            return nil, fmt.Errorf("lỗi tìm kiếm chuyến bay đi: %w", err)
-        }
-        inboundFlights, err := r.SearchFlights(
+    if err != nil {
+        log.Printf("Error searching outbound flights: %v", err)
+        return nil, fmt.Errorf("error searching outbound flights: %w", err)
+    }
+
+    // Get inbound flights
+    inboundFlights, err := r.SearchFlights(
         arrivalAirport,
         departureAirport,
         returnDate,
@@ -903,14 +907,15 @@ func (r *flightRepository) SearchRoundtripFlights(
         limit,
         sortBy,
         sortOrder,
-        false,
-        )
-        if err != nil {
-            log.Printf("Lỗi khi tìm kiếm chuyến bay về: %v", err)
-            return nil, fmt.Errorf("lỗi tìm kiếm chuyến bay về: %w", err)
-        }
-       return &dto.RoundtripSearchResult{
+        forUser,
+    )
+    if err != nil {
+        log.Printf("Error searching inbound flights: %v", err)
+        return nil, fmt.Errorf("error searching inbound flights: %w", err)
+    }
+
+    return &dto.RoundtripSearchResult{
         OutboundFlights: outboundFlights,
         InboundFlights:  inboundFlights,
     }, nil
-} 
+}
