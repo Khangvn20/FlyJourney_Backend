@@ -8,14 +8,13 @@ pipeline {
         COMPOSE_PROJECT_NAME = 'flyjourney'
     }
     stages {
-        stage('Setup Docker Permissions') {
+         stage('Install Dependencies') {
             steps {
-                script {
-                    sh '''
-                        sudo usermod -aG docker jenkins || true
-                        sudo chmod 666 /var/run/docker.sock || true
-                    '''
-                }
+                sh '''
+                    apk add --no-cache git curl
+                    curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                    chmod +x /usr/local/bin/docker-compose
+                '''
             }
         }
         stage('Checkout Code') {
