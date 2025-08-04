@@ -8,6 +8,18 @@ pipeline {
         DOCKER_CREDENTIALS_ID = 'docker-hub-credentials'
         COMPOSE_PROJECT_NAME = 'flyjourney'
     }
+       stages {
+        stage('Setup Docker Permissions') {
+            steps {
+                script {
+                
+                    sh '''
+                        sudo usermod -aG docker jenkins || true
+                        sudo chmod 666 /var/run/docker.sock || true
+                    '''
+                }
+            }
+        }
     stages {
         stage('Checkout Code') {
             steps {
