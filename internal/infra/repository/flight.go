@@ -839,6 +839,92 @@ func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string
 
     return count, nil
 }
+func (r *flightRepository) GetFareClassByFlightID(flightID int) ([]*dto.FlightClass, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    query := `
+        SELECT 
+            fc.flight_class_id, 
+            fc.flight_id, 
+            fc.class, 
+            fc.base_price, 
+            fc.available_seats, 
+            fc.total_seats, 
+            fc.base_price_child, 
+            fc.base_price_infant, 
+            fc.fare_class_code,
+            fcc.fare_class_code,
+            fcc.cabin_class, 
+            fcc.refundable, 
+            fcc.changeable, 
+            fcc.baggage_kg, 
+            fcc.
+            fcc.description
+        FROM flight_classes fc
+        LEFT JOIN fare_classes fcc ON fc.fare_class_code = fcc.fare_class_code
+        WHERE fc.flight_id = $1
+        ORDER BY fc.base_price ASC
+    `
+
+    rows, err := r.db.Query(ctx, query, flightID)
+    if err != nil {
+        log.Printf("Error querying fare classes by flight ID: %v", err)
+        return nil, fmt.Errorf("error querying fare classes: %w", err)
+    }
+    defer rows.Close()
+
+    flightClasses := []*dto.FlightClass{}
+
+    for rows.Next() {
+        var fc dto.FlightClass
+        var fareClass dto.FareClasses
+        var fareClassCode, cabinClass, baggageKg, description sql.NullString
+        var refundable, changeable sql.NullBool
+
+        err := rows.Scan(
+            &fc.FlightClassID,
+            &fc.FlightID,
+            &fc.Class,
+            &fc.BasePrice,
+            &fc.AvailableSeats,
+            &fc.TotalSeats,
+            &fc.BasePriceChild,
+            &fc.BasePriceInfant,
+            &fc.FareClassCode,
+            &fareClassCode,
+            &cabinClass,
+            &refundable,
+            &changeable,
+            &baggageKg,
+            &description,
+        )
+        if err != nil {
+            log.Printf("Error scanning fare class row: %v", err)
+            return nil, fmt.Errorf("error scanning fare class: %w", err)
+        }
+
+        // Set fare class details if exists
+        if fareClassCode.Valid {
+            fareClass.FareClassCode = fareClassCode.String
+            fareClass.CabinClass = cabinClass.String
+            fareClass.Refundable = refundable.Bool
+            fareClass.Changeable = changeable.Bool
+            fareClass.Baggage_kg = baggageKg.String
+            fareClass.Description = description.String
+            fc.FareClassDetails = &fareClass
+        }
+
+        flightClasses = append(flightClasses, &fc)
+    }
+
+    if err := rows.Err(); err != nil {
+        log.Printf("Error iterating fare class rows: %v", err)
+        return nil, fmt.Errorf("error iterating rows: %w", err)
+    }
+
+    return flightClasses, nil
+}
 func (r *flightRepository) UpdateStatus(id int, status string) error {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()

@@ -13,6 +13,7 @@ type FlightRepository interface {
 	 GetByFlightNumber(flightNumber string) (*dto.Flight, error)
      GetByRoute(departureAirport, arrivalAirport string, date time.Time) ([]*dto.Flight, error)
      GetByAirline(airlineID int, page, limit int) ([]*dto.Flight, error)
+     GetFareClassByFlightID(flightID int, class string) (*dto.FlightClass, error)
      GetByStatus(status string, page, limit int) ([]*dto.Flight, error)
 	//Search methods
 	 SearchFlights(
