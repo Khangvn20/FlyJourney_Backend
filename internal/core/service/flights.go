@@ -874,8 +874,8 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
 
     // Tìm chuyến bay chiều đi
     outboundFlights, err := s.flightRepo.SearchFlights(
-        req.DepartureAirport,
-        req.ArrivalAirport,
+        req.DepartureAirportCode,
+        req.DepartureAirportCode,
         req.DepartureDate,
         req.FlightClass,
         airlineIDs,
@@ -897,8 +897,8 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
 
     // Tìm chuyến bay chiều về
     inboundFlights, err := s.flightRepo.SearchFlights(
-        req.ArrivalAirport,
-        req.DepartureAirport,
+        req.ArrivalAirportCode,
+        req.DepartureAirportCode,
        req.ReturnDate,
         req.FlightClass,
         airlineIDs,
@@ -909,6 +909,54 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
         sortOrder,
         false, // Admin: lấy tất cả status
     )
+    //Caculate total count for outbound and inbound flights
+               for _, flight := range outboundFlights {
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
+    }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
+
+    for _, flight := range inboundFlights {
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
+    }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
     if err != nil {
         log.Printf("Error searching inbound flights: %v", err)
         return &response.Response{
@@ -920,8 +968,8 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
 
     // Đếm tổng số chuyến bay chiều đi
     outboundCount, err := s.flightRepo.CountBySearch(
-        req.DepartureAirport,
-        req.ArrivalAirport,
+        req.DepartureAirportCode,
+        req.ArrivalAirportCode,
         req.DepartureDate,
         false, // Admin: lấy tất cả status
     )
@@ -929,10 +977,9 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
         outboundCount = len(outboundFlights)
     }
 
-    // Đếm tổng số chuyến bay chiều về
     inboundCount, err := s.flightRepo.CountBySearch(
-        req.ArrivalAirport,
-        req.DepartureAirport,
+        req.ArrivalAirportCode,
+        req.DepartureAirportCode,
         req.ReturnDate,
         false, // Admin: lấy tất cả status
     )
@@ -956,8 +1003,8 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
             "inbound_total_pages":   inboundTotalPages,
             "page":                  page,
             "limit":                 limit,
-            "departure_airport":     req.DepartureAirport,
-            "arrival_airport":       req.ArrivalAirport,
+            "departure_airport":     req.DepartureAirportCode,
+            "arrival_airport":       req.ArrivalAirportCode,
             "departure_date":        req.DepartureDate,
             "return_date":           req.ReturnDate,
             "flight_class":          req.FlightClass,
@@ -1115,9 +1162,10 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
     if req.SortOrder != "" {
         sortOrder = req.SortOrder
     }
+    
     outboundFlights, err := s.flightRepo.SearchFlights(
-        req.DepartureAirport,
-        req.ArrivalAirport,
+        req.DepartureAirportCode,
+        req.ArrivalAirportCode,
         req.DepartureDate,
         req.FlightClass,
         airlineIDs,
@@ -1137,8 +1185,8 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
         }
     }
     inboundFlights, err := s.flightRepo.SearchFlights(
-        req.ArrivalAirport,
-        req.DepartureAirport,
+        req.ArrivalAirportCode,
+        req.DepartureAirportCode,
         req.ReturnDate,
         req.FlightClass,
         airlineIDs,
@@ -1149,6 +1197,55 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
         sortOrder,
         true,
     )
+
+    //Cacutalate total count for outbound and inbound flights
+                  for _, flight := range outboundFlights {
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
+    }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
+
+    for _, flight := range inboundFlights {
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
+    }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
     if err != nil {
         log.Printf("Error searching inbound flights: %v", err)
         return &response.Response{
@@ -1157,47 +1254,53 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
             ErrorMessage: "Error searching inbound flights",
         }
     }
-    outboundFlightsCount, err := s.flightRepo.CountBySearch(
-        req.DepartureAirport,
-        req.ArrivalAirport,
+     outboundCount, err := s.flightRepo.CountBySearch(
+        req.DepartureAirportCode,
+        req.ArrivalAirportCode,
         req.DepartureDate,
-        true,
-    )
-    if err !=nil {
-        outboundFlightsCount = len(outboundFlights)
-    }   
-    inboundFlightsCount, err := s.flightRepo.CountBySearch(
-        req.ArrivalAirport,
-        req.DepartureAirport,
-        req.DepartureDate,
-        true,
+        false,
     )
     if err != nil {
-        inboundFlightsCount = len(inboundFlights)
+        outboundCount = len(outboundFlights)
     }
-    outboundFlightsTotalPages := (outboundFlightsCount + limit - 1) / limit
-    inboundFlightsTotalPages := (inboundFlightsCount + limit - 1) / limit
+
+    inboundCount, err := s.flightRepo.CountBySearch(
+        req.ArrivalAirportCode,
+        req.DepartureAirportCode,
+        req.ReturnDate,
+        false,
+    )
+    if err != nil {
+        inboundCount = len(inboundFlights)
+    }
+
+    outboundTotalPages := (outboundCount + limit - 1) / limit
+    inboundTotalPages := (inboundCount + limit - 1) / limit
+
+    roundtripResult := &dto.RoundtripSearchResult{
+        OutboundFlights: outboundFlights,
+        InboundFlights:  inboundFlights,
+    }
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
-        ErrorMessage: "Successfully searched roundtrip flights for user",
+        ErrorMessage: "Successfully searched roundtrip flights",
         Data: map[string]interface{}{
-            "outbound_flights": outboundFlights,
-            "inbound_flights":  inboundFlights,
-            "outbound_total_count": outboundFlightsCount,
-            "inbound_total_count":  inboundFlightsCount,
-            "outbound_total_pages": outboundFlightsTotalPages,
-            "inbound_total_pages":  inboundFlightsTotalPages,
-            "page":              page,
-            "limit":             limit,
-            "departure_airport": req.DepartureAirport,
-            "arrival_airport":   req.ArrivalAirport,
-            "departure_date":    req.DepartureDate,
-            "return_date":       req.ReturnDate,
-            "flight_class":      req.FlightClass,
-            "passenger_count":   req.Passengers,
-            "sort_by":           sortBy,
-            "sort_order":        sortOrder,
+            "search_results":        roundtripResult,
+            "outbound_total_count":    outboundCount,
+            "inbound_total_count":     inboundCount,
+            "outbound_total_pages":    outboundTotalPages,
+            "inbound_total_pages":     inboundTotalPages,
+            "page":                    page,
+            "limit":                   limit,
+            "departure_airport":       req.DepartureAirportCode,
+            "arrival_airport":         req.ArrivalAirportCode,
+            "departure_date":          req.DepartureDate,
+            "return_date":             req.ReturnDate,
+            "flight_class":            req.FlightClass,
+            "passenger_count":         req.Passengers,
+            "sort_by":                 sortBy,
+            "sort_order":              sortOrder,
         },
     }
 }

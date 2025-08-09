@@ -42,6 +42,7 @@ type FlightRepository interface {
         limit int,
         sortBy string,
         sortOrder string,
+        isActive bool,
     ) (*dto.RoundtripSearchResult, error)
 		//Metadata methods
 		 Count() (int, error)

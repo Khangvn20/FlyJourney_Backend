@@ -1,0 +1,830 @@
+{
+	"info": {
+		"_postman_id": "5d47c41f-4d7a-447e-aae2-afaa4969a4ae",
+		"name": "FlyJourney",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "34182506",
+		"_collection_link": "https://a88888-3816.postman.co/workspace/Lufian-Api~c0ec986f-d444-4489-8021-67c501ccbfa8/collection/34182506-5d47c41f-4d7a-447e-aae2-afaa4969a4ae?action=share&source=collection_link&creator=34182506"
+	},
+	"item": [
+		{
+			"name": "user",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"devtest01@mailnesia.com\",\r\n    \"password\": \"abcd1234\",\r\n    \"name\": \"Ken Tran\",\r\n    \"phone\": \"0936912309\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/auth/register",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm_Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n   \r\n    \"name\":\"Ken Tran\",\r\n    \"email\": \"devtest01@mailnesia.com\",\r\n    \"otp\":\"156134\",\r\n    \"phone\":\"0936912309\",\r\n    \"password\":\"abcd1234\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/auth/confirm-register",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"confirm-register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();\r",
+									"\r",
+									"// Test for successful status code\r",
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.expect(pm.response.code).to.equal(200);\r",
+									"});\r",
+									"\r",
+									"// Check if token exists in the response and set it to environment variable\r",
+									"pm.test(\"Token is present in response\", function () {\r",
+									"    pm.expect(response.data.token).to.exist;\r",
+									"    pm.environment.set(\"token\", response.data.token);\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"devtest01@mailnesia.com\",\r\n    \"password\":\"hello1234\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/auth/login",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "reset-password",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"devtest01@mailnesia.com\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/auth/reset-password",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"reset-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "confirm_password",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"khang012@mailnesia.com\",\r\n    \"new_password\": \"khang@123\",\r\n    \"otp\":\"999853\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/auth/confirm-reset-password",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"confirm-reset-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/auth/logout",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "info_user",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseURL}}/api/v1/users/",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "update",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"phone\" : \"0912345609\",\r\n    \"name\" :\"Tran Phuong Khoi\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/users/",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetAllUser",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "flights",
+			"item": [
+				{
+					"name": "Admin",
+					"item": [
+						{
+							"name": "CreateNewFlight",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"airline_id\": 2,\r\n  \"aircraft_id\": 8,\r\n  \"flight_number\": \"VN125\",\r\n  \"departure_airport\": \"SGN\",\r\n  \"arrival_airport\": \"HAN\",\r\n  \"departure_time\": \"2025-07-01T08:00:00Z\",\r\n  \"arrival_time\": \"2025-07-01T10:00:00Z\",\r\n  \"duration_minutes\": 120,\r\n  \"stops_count\": 1,\r\n  \"tax_and_fees\": 200000,\r\n  \"status\": \"scheduled\",\r\n  \"gate\": \"A5\",\r\n  \"terminal\": \"T1\",\r\n  \"distance\": 1160,\r\n  \"flight_classes\": [\r\n    {\r\n      \"class\": \"economy\",\r\n      \"base_price\": 1200000,\r\n      \"available_seats\": 162,\r\n      \"total_seats\": 162\r\n    },\r\n    {\r\n      \"class\": \"business\",\r\n      \"base_price\": 3500000,\r\n      \"available_seats\": 22,\r\n      \"total_seats\": 22\r\n    }\r\n  ]\r\n}"
+								},
+								"url": {
+									"raw": "{{baseURL}}/api/v1/admin/flights/",
+									"host": [
+										"{{baseURL}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"admin",
+										"flights",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "GetAllFlight",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "http://localhost:3000/api/v1/admin/flights/",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "3000",
+									"path": [
+										"api",
+										"v1",
+										"admin",
+										"flights",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "GetFlightAdmin",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE1NTUzMjgsImlhdCI6MTc1MTQ2ODkyOCwicm9sZSI6InthZG1pbn0iLCJ1c2VyX2lkIjoiNyJ9.RrHLdVGA-pnRBD5QXw2R0vTXuGSu1IIdiODUYLrlFkY",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseURL}}/api/v1/admin/flights/14",
+									"host": [
+										"{{baseURL}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"admin",
+										"flights",
+										"14"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "SearchRoundTripAdmin",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTIzMDU3MDgsImlhdCI6MTc1MjIxOTMwOCwicm9sZSI6InthZG1pbn0iLCJ1c2VyX2lkIjoiNyJ9.jTA03c7JIV8drEXnMY5YzEoNsmltv7E4-wL3n4CRHiI",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"departure_airport\": \"SGN\",\r\n    \"arrival_airport\": \"HAN\",\r\n    \"departure_date\": \"2025-07-10T00:00:00Z\",\r\n    \"return_date\": \"2025-07-15T00:00:00Z\",\r\n    \"flight_class\": \"economy\", \r\n    \"passengers\": 2,\r\n    \"page\": 1,\r\n    \"limit\": 10,\r\n    \"sort_by\": \"departure_time\",\r\n    \"sort_order\": \"ASC\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseURL}}/api/v1/admin/flights/search/roundtrip",
+									"host": [
+										"{{baseURL}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"admin",
+										"flights",
+										"search",
+										"roundtrip"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CreateFlightClassForFlight",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTM1NDEwOTgsImlhdCI6MTc1MzQ1NDY5OCwicm9sZSI6InthZG1pbn0iLCJ1c2VyX2lkIjoiNyJ9.yzDoVk_XXWAyt5ptacGmZrW7JL-FsKaHfDWIgX9qxck",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{baseURL}}/api/v1/admin/flights/48/classes",
+									"host": [
+										"{{baseURL}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"admin",
+										"flights",
+										"48",
+										"classes"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "SearchFlightAdmin",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"departure_airport\": \"SGN\",\r\n  \"arrival_airport\": \"HAN\",\r\n  \"departure_date\": \"2025-07-01T00:00:00Z\",\r\n  \"arrival_date\": \"2025-07-01T00:00:00Z\",\r\n  \"flight_class\": \"economy\",\r\n  \"max_stops\": 0,\r\n  \"page\": 1,\r\n  \"limit\": 10,\r\n  \"sort_by\": \"departure_time\",\r\n  \"sort_order\": \"ASC\"\r\n}"
+								},
+								"url": {
+									"raw": "{{baseURL}}/api/admin/v1/flights/search",
+									"host": [
+										"{{baseURL}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"v1",
+										"flights",
+										"search"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "GetFareClass",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTQ2NjYzNjEsImlhdCI6MTc1NDU3OTk2MSwicm9sZSI6InthZG1pbn0iLCJ1c2VyX2lkIjoiNyJ9.j2NuCmN1E_i1XaRacq1OIlsSH9yeABqn8QFOBGG5amU",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseURL}}/api/v1/admin/flights/fareclasses/53",
+									"host": [
+										"{{baseURL}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"admin",
+										"flights",
+										"fareclasses",
+										"53"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "GetByDate",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTQ2NjYzNjEsImlhdCI6MTc1NDU3OTk2MSwicm9sZSI6InthZG1pbn0iLCJ1c2VyX2lkIjoiNyJ9.j2NuCmN1E_i1XaRacq1OIlsSH9yeABqn8QFOBGG5amU",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"date\": \"01/08/2025\",\r\n  \"page\": 1,\r\n  \"limit\": 10,\r\n  \"status\": \"\",       \r\n  \"sort_by\": \"departure_time\",\r\n  \"sort_order\": \"ASC\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseURL}}/api/v1/admin/flights/search/date",
+									"host": [
+										"{{baseURL}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"admin",
+										"flights",
+										"search",
+										"date"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "GetFlightByIDUser",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseURL}}/api/v1/flights/53",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"53"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SearchFlight",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var template = `\r",
+									"<style type=\"text/css\">\r",
+									"    .tftable {font-size:14px;color:#333333;width:100%;border-width: 1px;border-color: #87ceeb;border-collapse: collapse;}\r",
+									"    .tftable th {font-size:18px;background-color:#87ceeb;border-width: 1px;padding: 8px;border-style: solid;border-color: #87ceeb;text-align:left;}\r",
+									"    .tftable tr {background-color:#ffffff;}\r",
+									"    .tftable td {font-size:14px;border-width: 1px;padding: 8px;border-style: solid;border-color: #87ceeb;}\r",
+									"    .tftable tr:hover {background-color:#e0ffff;}\r",
+									"</style>\r",
+									"\r",
+									"<table class=\"tftable\" border=\"1\">\r",
+									"    <tr>\r",
+									"        <th>Flight ID</th>\r",
+									"        <th>Flight Number</th>\r",
+									"        <th>Airline Name</th>\r",
+									"        <th>Departure Airport</th>\r",
+									"        <th>Arrival Airport</th>\r",
+									"        <th>Departure Time</th>\r",
+									"        <th>Arrival Time</th>\r",
+									"        <th>Duration (Minutes)</th>\r",
+									"        <th>Stops Count</th>\r",
+									"        <th>Grand Total</th>\r",
+									"        <th>Currency</th>\r",
+									"    </tr>\r",
+									"    \r",
+									"    {{#each response.data.search_results}}\r",
+									"        <tr>\r",
+									"            <td>{{flight_id}}</td>\r",
+									"            <td>{{flight_number}}</td>\r",
+									"            <td>{{airline_name}}</td>\r",
+									"            <td>{{departure_airport}}</td>\r",
+									"            <td>{{arrival_airport}}</td>\r",
+									"            <td>{{departure_time}}</td>\r",
+									"            <td>{{arrival_time}}</td>\r",
+									"            <td>{{duration_minutes}}</td>\r",
+									"            <td>{{stops_count}}</td>\r",
+									"            <td>{{pricing.grand_total}}</td>\r",
+									"            <td>{{pricing.currency}}</td>\r",
+									"        </tr>\r",
+									"    {{/each}}\r",
+									"</table>\r",
+									"`;\r",
+									"\r",
+									"function constructVisualizerPayload() {\r",
+									"    return {response: pm.response.json()};\r",
+									"}\r",
+									"\r",
+									"pm.visualizer.set(template, constructVisualizerPayload());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"protocolVersion": "auto"
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"departure_airport_code\": \"HAN\",\r\n    \"arrival_airport_code\": \"SGN\",\r\n    \"departure_date\": \"01/08/2025\",\r\n    \"flight_class\": \"all\",\r\n    \"passenger\": {\r\n        \"adults\": 1,\r\n        \"children\":1\r\n    },\r\n    \"page\": 1,\r\n    \"limit\": 50,\r\n    \"sort_by\": \"price\",\r\n    \"sort_order\": \"asc\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/flights/search",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"search"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "RoundTripSearch",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"departure_airport_code\": \"HAN\",\r\n    \"arrival_airport_code\": \"SGN\",\r\n    \"departure_date\": \"01/08/2025\",\r\n    \"return_date\": \"04/08/2025\",\r\n    \"flight_class\": \"all\",\r\n    \"passengers\": {\r\n        \"adults\": 1\r\n    },\r\n    \"page\": 1,\r\n    \"limit\": 50,\r\n    \"sort_by\": \"price\",\r\n    \"sort_order\": \"asc\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/flights/search/roundtrip",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"search",
+								"roundtrip"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "UpdateStatus",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTAxODM0ODIsInVzZXJfaWQiOiIxIn0.jFk_Iv6U7X7tJVRKoe8z_oIdJSBokqgzqkK9zytoN8s",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"status\": \"delayed\",\r\n    \"reason\": \"Bad weather conditions\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/flights/7/status",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"7",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "UpdateFlight",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTM2MDQ4NDUsImlhdCI6MTc1MzUxODQ0NSwicm9sZSI6InthZG1pbn0iLCJ1c2VyX2lkIjoiNyJ9.9beDV-6r55k9eeRo5WI5R1g_U5gJvvQSXA5hpYE8Bwc",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"airline_id\": 2,\r\n    \"flight_number\": \"VN874\",\r\n    \"departure_airport\": \"Sân Bay Tân Sơn Nhất\",\r\n    \"arrival_airport\": \"Sân Bay Đà Nẵng\",\r\n    \"departure_time\": \"28/07/2025 16:00\",\r\n    \"arrival_time\": \"28/07/2025 18:00\",\r\n    \"duration_minutes\": 120,\r\n    \"stops_count\": 0,\r\n    \"tax_and_fees\": 250000,\r\n    \"status\": \"scheduled\",\r\n    \"distance\": 1166,\r\n    \"currency\": \"VND\",\r\n    \"departure_code\": \"SGN\",\r\n    \"arrival_airport_code\": \"DAD\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/v1/admin/flights/48",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"flights",
+								"48"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetByStatus",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "GetByAirline",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseURL",
+			"value": "http://localhost:3000",
+			"type": "default"
+		}
+	]
+}
