@@ -100,5 +100,6 @@ type FareClasses struct {
     Changeable    bool   `json:"changeable"`
     Baggage_kg    string    `json:"baggage_kg"`
     Description   string    `json:"description"`
+    RefundChangePolicy string `json:"refund_change_policy"`
     
 }

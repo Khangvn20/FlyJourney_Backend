@@ -66,3 +66,12 @@ type UpdateFlightClassRequest struct {
     BasePriceInfant float64 `json:"base_price_infant" binding:"required"`
     FareClassCode  string  `json:"fare_class_code" binding:"required"`
 }
+type GetFlightsByDateRequest struct {
+    Date      string `json:"date" binding:"required"`        // Format: dd/mm/yyyy
+    Page      int    `json:"page"`                           // Default: 1
+    Limit     int    `json:"limit"`                          // Default: 10  
+    Status    string `json:"status,omitempty"`               // Optional filter by status
+    SortBy    string `json:"sort_by,omitempty"`              
+    SortOrder string `json:"sort_order,omitempty"`           
+}
+

@@ -24,8 +24,10 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
         adminRoutes.POST("/:id/classes", flightController.CreateFlightClasses)
         adminRoutes.PUT("/:id", flightController.UpdateFlight)
         adminRoutes.PATCH("/:id", flightController.UpdateFlightStatus)
+        adminRoutes.POST("/search/date", flightController.GetFlightsByDate)
         adminRoutes.GET("/:id", flightController.GetFlightByID)
         adminRoutes.POST("/search", flightController.SearchFlights)
+        adminRoutes.GET("/fareclasses/:id", flightController.GetFareCLassCode)
         adminRoutes.POST("/search/roundtrip", flightController.SearchRoundtripFlights)
     }
 	}
