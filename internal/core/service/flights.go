@@ -1282,10 +1282,6 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
         OutboundFlights: outboundFlights,
         InboundFlights:  inboundFlights,
     }
-
-    }
-
-
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
