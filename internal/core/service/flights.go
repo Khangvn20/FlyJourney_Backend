@@ -910,7 +910,7 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
         false, // Admin: lấy tất cả status
     )
     //Caculate total count for outbound and inbound flights
-               for _, flight := range outboundFlights {
+     for _, flight := range outboundFlights {
     passengers := req.Passengers
     totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
     var totalChildCost, totalInfantCost float64
@@ -957,6 +957,7 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
 
     flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
 }
+
     if err != nil {
         log.Printf("Error searching inbound flights: %v", err)
         return &response.Response{
@@ -1199,7 +1200,7 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
     )
 
     //Cacutalate total count for outbound and inbound flights
-                  for _, flight := range outboundFlights {
+     for _, flight := range outboundFlights {
     passengers := req.Passengers
     totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
     var totalChildCost, totalInfantCost float64
@@ -1281,11 +1282,16 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
         OutboundFlights: outboundFlights,
         InboundFlights:  inboundFlights,
     }
+
+    }
+
+
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
         ErrorMessage: "Successfully searched roundtrip flights",
         Data: map[string]interface{}{
+
             "search_results":        roundtripResult,
             "outbound_total_count":    outboundCount,
             "inbound_total_count":     inboundCount,

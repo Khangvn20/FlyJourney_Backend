@@ -44,7 +44,6 @@ type FlightRepository interface {
         sortOrder string,
         isActive bool,
     ) (*dto.RoundtripSearchResult, error)
-		//Metadata methods
 		 Count() (int, error)
          CountByDate(departureDate time.Time) (int, error)
          CountBySearch(departureAirport, arrivalAirport string, departureDate string,forUser bool, ) (int, error)

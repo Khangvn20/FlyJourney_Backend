@@ -27,6 +27,7 @@ services:
       - flyjourney_network
     restart: unless-stopped
 
+
   app:
     build:
       context: .
@@ -42,7 +43,6 @@ services:
       REDIS_HOST: redis            
       REDIS_PORT: 6379            
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      
       JWT_SECRET: ${JWT_SECRET}
       EMAIL_USER: ${email_user}
       PASSWORD_USER: ${password_user}
