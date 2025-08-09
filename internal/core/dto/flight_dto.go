@@ -42,7 +42,8 @@ type FlightSearchResult struct {
     FlightNumber         string `json:"flight_number"`
     AirlineID           int    `json:"airline_id"`
     AirlineName         string `json:"airline_name"`
-    AirlineLogo         string `json:"logo_url"` // Optional field for airline logo URL
+
+    LogoUrl             string `json:"logo_url"`
     
     // Airport & Time info
     DepartureAirportCode string `json:"departure_airport_code"`
@@ -66,6 +67,7 @@ type FlightSearchResult struct {
     Pricing             PricingDetails `json:"pricing"`
     TaxAndFees        float64 `json:"tax_and_fees"`
 }
+
 
 type PricingDetails struct {
     BasePrices struct {

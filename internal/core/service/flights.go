@@ -910,20 +910,54 @@ func (s *flightService) SearchRoundtripFlights(req *request.RoundtripFlightSearc
         false, // Admin: lấy tất cả status
     )
     //Caculate total count for outbound and inbound flights
-    for _, flight := range outboundFlights {
-        passengers := req.Passengers
-        totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
-        totalChildCost := flight.Pricing.TotalPrices.Child * float64(passengers.Children)
-        totalInfantCost := flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
-        flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+     for _, flight := range outboundFlights {
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
     }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
+
     for _, flight := range inboundFlights {
-        passengers := req.Passengers
-        totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
-        totalChildCost := flight.Pricing.TotalPrices.Child * float64(passengers.Children)
-        totalInfantCost := flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
-        flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
     }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
+
     if err != nil {
         log.Printf("Error searching inbound flights: %v", err)
         return &response.Response{
@@ -1166,20 +1200,53 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
     )
 
     //Cacutalate total count for outbound and inbound flights
-    for _, flight := range outboundFlights {
-        passengers := req.Passengers
-        totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
-        totalChildCost := flight.Pricing.TotalPrices.Child * float64(passengers.Children)
-        totalInfantCost := flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
-        flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+     for _, flight := range outboundFlights {
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
     }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
+
     for _, flight := range inboundFlights {
-        passengers := req.Passengers
-        totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
-        totalChildCost := flight.Pricing.TotalPrices.Child * float64(passengers.Children)
-        totalInfantCost := flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
-        flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+    passengers := req.Passengers
+    totalAdultCost := flight.Pricing.TotalPrices.Adult * float64(passengers.Adults)
+    var totalChildCost, totalInfantCost float64
+
+    if passengers.Children > 0 {
+        totalChildCost = flight.Pricing.TotalPrices.Child * float64(passengers.Children)
+    } else {
+        flight.Pricing.BasePrices.Child = 0
+        flight.Pricing.TotalPrices.Child = 0
+        flight.Pricing.Taxes.Child = 0
     }
+
+    if passengers.Infants > 0 {
+        totalInfantCost = flight.Pricing.TotalPrices.Infant * float64(passengers.Infants)
+    } else {
+        flight.Pricing.BasePrices.Infant = 0
+        flight.Pricing.TotalPrices.Infant = 0
+        flight.Pricing.Taxes.Infant = 0
+    }
+
+    flight.Pricing.GrandTotal = totalAdultCost + totalChildCost + totalInfantCost
+}
     if err != nil {
         log.Printf("Error searching inbound flights: %v", err)
         return &response.Response{
@@ -1211,14 +1278,21 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
     outboundTotalPages := (outboundCount + limit - 1) / limit
     inboundTotalPages := (inboundCount + limit - 1) / limit
 
+    roundtripResult := &dto.RoundtripSearchResult{
+        OutboundFlights: outboundFlights,
+        InboundFlights:  inboundFlights,
+    }
+
+    }
+
 
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
         ErrorMessage: "Successfully searched roundtrip flights",
         Data: map[string]interface{}{
-            "outbound_search_results": outboundFlights,
-            "inbound_search_results":  inboundFlights,
+
+            "search_results":        roundtripResult,
             "outbound_total_count":    outboundCount,
             "inbound_total_count":     inboundCount,
             "outbound_total_pages":    outboundTotalPages,
