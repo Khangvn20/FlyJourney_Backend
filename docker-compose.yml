@@ -27,6 +27,7 @@ services:
       - flyjourney_network
     restart: unless-stopped
 
+
   app:
     build:
       context: .
