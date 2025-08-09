@@ -1,0 +1,516 @@
+{
+	"info": {
+		"_postman_id": "5d47c41f-4d7a-447e-aae2-afaa4969a4ae",
+		"name": "FlyJourney",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "34182506",
+		"_collection_link": "https://a88888-3816.postman.co/workspace/Lufian-Api~c0ec986f-d444-4489-8021-67c501ccbfa8/collection/34182506-5d47c41f-4d7a-447e-aae2-afaa4969a4ae?action=share&source=collection_link&creator=34182506"
+	},
+	"item": [
+		{
+			"name": "user",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"khangvokhang87@gmail.com\",\r\n    \"password\":\"vnvk090123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/users/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm_Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n   \r\n    \"Name\":\"Vi Khang\",\r\n     \"email\": \"khangvokhang87@gmail.com\",\r\n     \"otp\":\"664729\",\r\n     \"password\":\"vnvk090123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/users/confirm-register",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"confirm-register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "reset-password",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"khangvokhang87@gmail.com\"\r\n   \r\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/users/reset-password",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"reset-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDk4MzQ4NTksInVzZXJfaWQiOiIxIn0.NxTCBqU3w36B471MmtM3SD91Wad2YyhmOTDaQFjj32g",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"token\" :\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDk4MzQ1MzMsInVzZXJfaWQiOiIxIn0.DiHy4YIEQYBfAhbNyHsJi75VJZixRGzy6P0HungimQA\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/users/logout",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "info_user",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTAwODY0OTMsInVzZXJfaWQiOiIxIn0.FoeyV3Ccv63xzr1AJi3FIcNviTz8Qr0HwA9278Qadq8",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "",
+								"value": "",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "http://localhost:3000/api/v1/users/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"users",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "update",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTAwODY0OTMsInVzZXJfaWQiOiIxIn0.FoeyV3Ccv63xzr1AJi3FIcNviTz8Qr0HwA9278Qadq8",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"phone\" : \"0854053526\",\r\n    \"name\" :\"khang012\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/users/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"users",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "confirm_password",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"khang012@mailnesia.com\",\r\n    \"password\": \"khang@123\",\r\n    \"name\": \"khang13\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/auth/register",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "flights",
+			"item": [
+				{
+					"name": "CreateNewFlight",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTAxODM0ODIsInVzZXJfaWQiOiIxIn0.jFk_Iv6U7X7tJVRKoe8z_oIdJSBokqgzqkK9zytoN8s",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"airline_id\": 2,\r\n  \"aircraft_id\": 8,\r\n  \"flight_number\": \"VN125\",\r\n  \"departure_airport\": \"SGN\",\r\n  \"arrival_airport\": \"HAN\",\r\n  \"departure_time\": \"2025-07-01T08:00:00Z\",\r\n  \"arrival_time\": \"2025-07-01T10:00:00Z\",\r\n  \"duration_minutes\": 120,\r\n  \"stops_count\": 1,\r\n  \"tax_and_fees\": 200000,\r\n  \"status\": \"scheduled\",\r\n  \"gate\": \"A5\",\r\n  \"terminal\": \"T1\",\r\n  \"distance\": 1160,\r\n  \"flight_classes\": [\r\n    {\r\n      \"class\": \"economy\",\r\n      \"base_price\": 1200000,\r\n      \"available_seats\": 162,\r\n      \"total_seats\": 162\r\n    },\r\n    {\r\n      \"class\": \"business\",\r\n      \"base_price\": 3500000,\r\n      \"available_seats\": 22,\r\n      \"total_seats\": 22\r\n    }\r\n  ]\r\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/flights",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"flights"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetFlightByIDUser",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "SearchFlightUser",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"departure_airport\": \"SGN\",\r\n    \"arrival_airport\": \"HAN\", \r\n    \"departure_date\": \"2025-07-10T00:00:00Z\",\r\n    \"flight_class\": \"economy\",\r\n    \"page\": 1,\r\n    \"limit\": 10,\r\n    \"sort_by\": \"departure_time\",\r\n    \"sort_order\": \"ASC\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/flights/search",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"search"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "UpdateStatus",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTAxODM0ODIsInVzZXJfaWQiOiIxIn0.jFk_Iv6U7X7tJVRKoe8z_oIdJSBokqgzqkK9zytoN8s",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"status\": \"delayed\",\r\n    \"reason\": \"Bad weather conditions\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/v1/flights/7/status",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"7",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "UpdateFlight",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "GetByStatus",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "GetByAirline",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "New Request",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "RoundTripSearch",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/v1/search/roundtrip",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"search",
+								"roundtrip"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetFlightAdmin",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTE1NTUzMjgsImlhdCI6MTc1MTQ2ODkyOCwicm9sZSI6InthZG1pbn0iLCJ1c2VyX2lkIjoiNyJ9.RrHLdVGA-pnRBD5QXw2R0vTXuGSu1IIdiODUYLrlFkY",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/v1/admin/flights/14",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"flights",
+								"14"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SearchFlightAdmin",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"departure_airport\": \"SGN\",\r\n  \"arrival_airport\": \"HAN\",\r\n  \"departure_date\": \"2025-07-01T00:00:00Z\",\r\n  \"arrival_date\": \"2025-07-01T00:00:00Z\",\r\n  \"flight_class\": \"economy\",\r\n  \"max_stops\": 0,\r\n  \"page\": 1,\r\n  \"limit\": 10,\r\n  \"sort_by\": \"departure_time\",\r\n  \"sort_order\": \"ASC\"\r\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/admin/v1/flights/search",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"admin",
+								"v1",
+								"flights",
+								"search"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SearchRoundTripAdmin",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

@@ -200,6 +200,7 @@ func (c *FlightController) GetFlightsByAirline(ctx *gin.Context) {
     result := c.flightService.GetFlightByAirline(airlineID, page, limit)
     ctx.JSON(http.StatusOK, result)
 }
+
 func (c *FlightController) GetFlightsByStatus(ctx *gin.Context) {
     status := ctx.Param("status")
     
@@ -219,6 +220,28 @@ func (c *FlightController) GetFlightsByStatus(ctx *gin.Context) {
     result := c.flightService.GetFlightsByStatus(status, page, limit)
     ctx.JSON(http.StatusOK, result)
 }
+func (c *FlightController) GetFareCLassCode(ctx *gin.Context) {
+    idStr := ctx.Param("id")
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_ID",
+            "errorMessage": "Invalid flight ID format",
+        })
+        return
+    }
+    
+    result := c.flightService.GetFareCLassCode(id)
+    
+    statusCode := http.StatusOK
+    if !result.Status {
+        statusCode = http.StatusNotFound
+    }
+    
+    ctx.JSON(statusCode, result)
+}
+
 func (c *FlightController) UpdateFlightStatus(ctx *gin.Context) {
     idStr := ctx.Param("id")
     id, err := strconv.Atoi(idStr)
@@ -289,6 +312,20 @@ func (c *FlightController) GetFlightByIDForUser(ctx *gin.Context) {
     }
     
     ctx.JSON(statusCode, result)
+}
+func (c *FlightController) GetFlightsByDate(ctx *gin.Context) {
+    var req request.GetFlightsByDateRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+        })
+        return
+    }
+    
+    result := c.flightService.GetFlightsByDate(&req)
+    ctx.JSON(http.StatusOK, result)
 }
 func (c *FlightController) SearchFlightsForUser(ctx *gin.Context) {
     var req request.FlightSearchRequest

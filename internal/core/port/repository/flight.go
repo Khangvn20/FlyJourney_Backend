@@ -13,6 +13,8 @@ type FlightRepository interface {
 	 GetByFlightNumber(flightNumber string) (*dto.Flight, error)
      GetByRoute(departureAirport, arrivalAirport string, date time.Time) ([]*dto.Flight, error)
      GetByAirline(airlineID int, page, limit int) ([]*dto.Flight, error)
+     GetFlightsByDate(departureDate time.Time, page, limit int) ([]*dto.Flight, error)
+     GetFareClassesByFlightID(flightID int) ([]*dto.FareClasses, error)
      GetByStatus(status string, page, limit int) ([]*dto.Flight, error)
 	//Search methods
 	 SearchFlights(
@@ -43,7 +45,7 @@ type FlightRepository interface {
         isActive bool,
     ) (*dto.RoundtripSearchResult, error)
 		 Count() (int, error)
-    
+         CountByDate(departureDate time.Time) (int, error)
          CountBySearch(departureAirport, arrivalAirport string, departureDate string,forUser bool, ) (int, error)
     // Status updates
     UpdateStatus(id int, status string) error

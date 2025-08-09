@@ -1,16 +1,18 @@
 package repository
+
 import (
-    "context"
-    "errors"
-    "log"
-    "time" 
-    "database/sql"
-    "github.com/lib/pq"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
-    "github.com/jackc/pgx/v5"
-    "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/utils"
+	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"log"
+	"time"
+
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/common/utils"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lib/pq"
 )
 type flightRepository struct {
 	db *pgxpool.Pool
@@ -622,6 +624,7 @@ func (r *flightRepository) SearchFlights(
             fcc.cabin_class,
             fcc.refundable,
             fcc.changeable,
+            fcc.refund_change_policy,
             fcc.baggage_kg,
             fcc.description
         FROM flights f
@@ -725,6 +728,7 @@ func (r *flightRepository) SearchFlights(
             &cabinClass,
             &refundable,
             &changeable,
+            &fareClass.RefundChangePolicy,
             &baggageKg,
             &description,
         )
@@ -840,6 +844,158 @@ func (r *flightRepository) CountBySearch(departureAirport, arrivalAirport string
     }
 
     return count, nil
+}
+func (r *flightRepository) CountByDate (departureTime time.Time) (int, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    startDate := time.Date(departureTime.Year(), departureTime.Month(), departureTime.Day(), 0, 0, 0, 0, departureTime.Location())
+    endDate := startDate.Add(24 * time.Hour)
+
+    query := `
+        SELECT COUNT(*)
+        FROM flights
+        WHERE departure_time >= $1 AND departure_time < $2
+    `
+
+    var count int
+    err := r.db.QueryRow(ctx, query, startDate, endDate).Scan(&count)
+    if err != nil {
+        log.Printf("Error counting flights by date: %v", err)
+        return 0, err
+    }
+
+    return count, nil
+}
+func (r *flightRepository) GetFareClassesByFlightID(flightID int) ([]*dto.FareClasses, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    query := `
+        SELECT DISTINCT
+            fcc.fare_class_code,
+            fcc.cabin_class, 
+            fcc.refundable, 
+            fcc.changeable, 
+            fcc.baggage_kg, 
+            fcc.refund_change_policy,
+            fcc.description
+        FROM flight_classes fc
+        INNER JOIN fare_classes fcc ON fc.fare_class_code = fcc.fare_class_code
+        WHERE fc.flight_id = $1
+        ORDER BY fcc.fare_class_code
+    `
+
+    rows, err := r.db.Query(ctx, query, flightID)
+    if err != nil {
+        log.Printf("Error querying fare classes detail by flight ID: %v", err)
+        return nil, fmt.Errorf("error querying fare classes detail: %w", err)
+    }
+    defer rows.Close()
+
+    fareClasses := []*dto.FareClasses{}
+
+    for rows.Next() {
+        var fareClass dto.FareClasses
+
+        err := rows.Scan(
+            &fareClass.FareClassCode,
+            &fareClass.CabinClass,
+            &fareClass.Refundable,
+            &fareClass.Changeable,
+            &fareClass.Baggage_kg,
+            &fareClass.RefundChangePolicy,
+            &fareClass.Description,
+        )
+        if err != nil {
+            log.Printf("Error scanning fare class detail row: %v", err)
+            return nil, fmt.Errorf("error scanning fare class detail: %w", err)
+        }
+
+        fareClasses = append(fareClasses, &fareClass)
+    }
+
+    if err := rows.Err(); err != nil {
+        log.Printf("Error iterating fare class detail rows: %v", err)
+        return nil, fmt.Errorf("error iterating detail rows: %w", err)
+    }
+
+    return fareClasses, nil
+}
+func (r *flightRepository) GetFlightsByDate(departureTime time.Time, page, limit int ) ([]*dto.Flight, error) {
+      ctx, cancel :=context.WithTimeout(context.Background(), 5*time.Second)
+      defer cancel()
+      offset := (page - 1) * limit
+      startDate := time.Date(departureTime.Year(), departureTime.Month(), departureTime.Day(), 0, 0, 0, 0, departureTime.Location())
+      endDate := startDate.Add(24 * time.Hour)
+      query := `
+        SELECT DiSTINCT f.flight_id, f.airline_id, f.flight_number, f.departure_airport, f.arrival_airport,
+        f.departure_time, f.arrival_time, f.duration_minutes, f.stops_count, f.tax_and_fees,f.total_seats,
+        f.status, f.distance, f.departure_airport_code, f.arrival_airport_code, f.currency, f.created_at, f.updated_at,
+        fc.flight_class_id, fc.class, fc.base_price, fc.available_seats, fc.total_seats,fc.base_price_child, fc.base_price_infant, fc.fare_class_code,
+        fcc.fare_class_code, fcc.cabin_class, fcc.refundable, fcc.changeable, fcc.baggage_kg,fcc.refund_change_policy ,fcc.description
+        FROM flights f
+        INNER JOIN flight_classes fc ON f.flight_id = fc.flight_id
+        LEFT JOIN fare_classes fcc ON fc.fare_class_code = fcc.fare_class_code
+        WHERE f.departure_time >= $1 AND f.departure_time < $2
+        ORDER BY f.departure_time
+        LIMIT $3 OFFSET $4`
+    rows, err := r.db.Query(ctx, query, startDate, endDate, limit, offset)
+    if err != nil {
+        log.Printf("Error querying flights by date: %v", err)
+        return nil, err
+    }
+    defer rows.Close()
+    flights := []*dto.Flight{}
+    for rows.Next() {
+        var flight dto.Flight
+        var flightClass dto.FlightClass
+        var fareClass dto.FareClasses
+
+        err := rows.Scan(
+            &flight.FlightID,
+            &flight.AirlineID,
+            &flight.FlightNumber,
+            &flight.DepartureAirport,
+            &flight.ArrivalAirport,
+            &flight.DepartureTime,
+            &flight.ArrivalTime,
+            &flight.DurationMinutes,
+            &flight.StopsCount,
+            &flight.TaxAndFees,
+            &flight.TotalSeats,
+            &flight.Status,
+            &flight.Distance,
+            &flight.DepartureAirportCode,
+            &flight.ArrivalAiportCode,
+            &flight.Currency,
+            &flight.CreatedAt,
+            &flight.UpdatedAt,
+            &flightClass.FlightClassID,
+            &flightClass.Class,
+            &flightClass.BasePrice,
+            &flightClass.AvailableSeats,
+            &flightClass.TotalSeats,
+            &flightClass.BasePriceChild,
+            &flightClass.BasePriceInfant,
+            &flightClass.FareClassCode,
+            &fareClass.FareClassCode,
+            &fareClass.CabinClass,
+            &fareClass.Refundable,
+            &fareClass.Changeable,
+            &fareClass.Baggage_kg,
+            &fareClass.RefundChangePolicy, 
+            &fareClass.Description,
+        )
+        if err != nil {
+            log.Printf("Error scanning flight row: %v", err)
+            return nil, err
+        }
+        flight.FlightClasses = append(flight.FlightClasses, &flightClass)
+        flightClass.FareClassDetails = &fareClass
+        flights = append(flights, &flight)
+    }
+    return flights, nil
 }
 func (r *flightRepository) UpdateStatus(id int, status string) error {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
