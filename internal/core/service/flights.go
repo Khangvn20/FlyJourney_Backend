@@ -730,7 +730,105 @@ func (s *flightService) GetFlightByAirline(airlineID int, page, limit int) *resp
         Data: flights,
     }
 }
+func (s *flightService) GetFareCLassCode(flightID int) *response.Response {
+    fareClasses, err := s.flightRepo.GetFareClassesByFlightID(flightID)
+    if err != nil {
+        log.Printf("Error getting fare class code: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Failed to get fare class code",
+        }
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully retrieved fare class code",
+        Data:         fareClasses,
+    }
+}
+func (s *flightService) GetFlightsByDate(req *request.GetFlightsByDateRequest) *response.Response {
+      parsedDate, err := utils.ParseTime(req.Date)
+       if err != nil {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid date format. Supported formats: dd/mm/yyyy, yyyy-mm-dd, dd/mm/yyyy HH:mm",
+        }
+    }
+    flights, err := s.flightRepo.GetFlightsByDate(parsedDate, req.Page, req.Limit)
+    if err != nil {
+        log.Printf("Error getting flights by date: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Failed to get flights by date",
+        }
+    }
+    if req.Status != "" {
+        filteredFlights := make([]*dto.Flight, 0)
+        for _, flight := range flights {
+            if flight.Status == req.Status {
+                filteredFlights = append(filteredFlights, flight)
+            }
+        }
+        flights = filteredFlights
+    }
+    totalCount, err := s.flightRepo.CountByDate(parsedDate)
+    if err != nil {
+        log.Printf("Error counting flights by date: %v", err)
+        totalCount = len(flights)
+    }
+    if req.Limit <= 0 {
+        req.Limit = 10
+    }
+    if req.Page < 1 {
+        req.Page = 1
+    }
+    totalPages := (totalCount + req.Limit - 1) / req.Limit
 
+    // Transform data cho response
+    flightData := make([]map[string]interface{}, 0, len(flights))
+    for _, flight := range flights {
+        flightInfo := map[string]interface{}{
+            "flight_id":               flight.FlightID,
+            "airline_id":              flight.AirlineID,
+            "flight_number":           flight.FlightNumber,
+            "departure_airport":       flight.DepartureAirport,
+            "arrival_airport":         flight.ArrivalAirport,
+            "departure_time":          flight.DepartureTime,
+            "arrival_time":            flight.ArrivalTime,
+            "duration_minutes":        flight.DurationMinutes,
+            "stops_count":             flight.StopsCount,
+            "tax_and_fees":            flight.TaxAndFees,
+            "total_seats":             flight.TotalSeats,
+            "status":                  flight.Status,
+            "distance":                flight.Distance,
+            "departure_airport_code":  flight.DepartureAirportCode,
+            "arrival_airport_code":    flight.ArrivalAiportCode,
+            "currency":                flight.Currency,
+            "created_at":              flight.CreatedAt,
+            "updated_at":              flight.UpdatedAt,
+            "flight_classes":          flight.FlightClasses,
+        }
+        flightData = append(flightData, flightInfo)
+    }
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successfully retrieved flights by date",
+        Data: map[string]interface{}{
+            "flights":     flightData,
+            "date":        req.Date,
+            "total_count": totalCount,
+            "page":        req.Page,
+            "limit":       req.Limit,
+            "total_pages": totalPages,
+            "status_filter": req.Status,
+        },
+    }
+}
 func (s *flightService) GetFlightsByStatus(status string, page, limit int) *response.Response {
     flights, err := s.flightRepo.GetByStatus(status, page, limit)
     if err != nil {
