@@ -313,7 +313,7 @@ func (s *userService) GetUserInfo(userID int) *response.Response {
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InternalError,
-            ErrorMessage: error_code.InternalErrMsg,
+            ErrorMessage: "Failed to get user",
         }
     }
     if user == nil {
@@ -326,8 +326,8 @@ func (s *userService) GetUserInfo(userID int) *response.Response {
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
-        ErrorMessage: error_code.SuccessErrMsg,
-        Data:         user, 
+        ErrorMessage: "Successfully get user",
+        Data:         user,
     }
 }
 func (s *userService) GetAllUsers(page, limit int) (*response.Response, error) {

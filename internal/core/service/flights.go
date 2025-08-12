@@ -76,22 +76,6 @@ func (s *flightService) CreateFlightClasses(flightID int, req []request.FlightCl
     }, nil
 }
 func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response.Response {
-		existingFlight, err := s.flightRepo.GetByFlightNumber(req.FlightNumber)
-    if err != nil {
-        log.Printf("Error checking flight number: %v", err)
-        return &response.Response{
-            Status:       false,
-            ErrorCode:    error_code.InternalError,
-            ErrorMessage: "Failed to check flight number",
-        }
-    }
-	    if existingFlight != nil {
-        return &response.Response{
-            Status:       false,
-            ErrorCode:    error_code.InvalidRequest,
-            ErrorMessage: "Flight number already exists",
-        }
-    }
 	  if len(req.FlightClasses) == 0 {
         return &response.Response{
             Status:       false,
@@ -209,6 +193,19 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
     
 }
 
+func (s *flightService) BatchCreateFlights(req *request.BatchCreateFlightRequest) *response.Response {
+    var results []response.Response
+    for _, flight := range req.Flights {
+        res := s.CreateFlight(&flight)
+        results = append(results, *res)
+    }
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Batch create flights completed",
+        Data:         results,
+    }
+}
 func (s *flightService) UpdateFlight(flightID int, req *request.UpdateFlightRequest) *response.Response {
 	    existingFlight, flightClasses, err := s.flightRepo.GetByID(flightID)
 
