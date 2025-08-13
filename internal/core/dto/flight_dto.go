@@ -39,6 +39,7 @@ type FlightClass struct {
 type FlightSearchResult struct {
     // Flight basic info
     FlightID             int    `json:"flight_id"`
+    FlightClassID        int    `json:"flight_class_id"`
     FlightNumber         string `json:"flight_number"`
     AirlineID           int    `json:"airline_id"`
     AirlineName         string `json:"airline_name"`
