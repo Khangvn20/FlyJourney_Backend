@@ -186,7 +186,6 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
         log.Printf("Warning: Could not set booking timeout: %v", err)
     }
     
-    // 11. Trả về kết quả thành công
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,

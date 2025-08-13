@@ -27,14 +27,15 @@ func (r *bookingRepository) CheckFlightClassAvailability(flightClassID int64) (b
 	err := r.db.QueryRow(ctx, query, flightClassID).Scan(&available_seats, &total_seats)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return false, 0, nil // No such flight class
+			return false, 0, nil 
 		}
 		return false, 0, fmt.Errorf("failed to check availability: %w", err)
 	}
 	return available_seats > 0, available_seats, nil
 }
 
-func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, error) {	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, error) {	
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	tx, err :=r.db.Begin(ctx)
