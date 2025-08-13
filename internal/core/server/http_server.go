@@ -80,10 +80,11 @@ func NewHTTPServer(port int) (*Server, error) {
 
     // Initialize repository
     userRepo := repository.NewUserRepository(db)
+    bookingRepo := repository.NewBookingRepository(db.GetPool())
     flightRepo := repository.NewFlightRepository(db.GetPool())
     // Initialize services
     redisService := service.NewRedisService(redisClient)
-    
+    bookingService := service.NewBookingService(bookingRepo,redisService)
     emailOTPService := service.NewEmailOTPService()
      tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
@@ -91,6 +92,7 @@ func NewHTTPServer(port int) (*Server, error) {
 
 
     // Initialize controller
+    bookingController := controller.NewBookingController(bookingService)
     userController := controller.NewUserController(userService)
     flightController := controller.NewFlightController(flightService)
 
@@ -102,6 +104,7 @@ func NewHTTPServer(port int) (*Server, error) {
     router.AuthRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
     router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
     router.FlightRoutes(apiV1, flightController, middleware.AuthMiddleware(tokenService))
+    router.BookingRoutes(apiV1, bookingController, middleware.AuthMiddleware(tokenService))
     return &Server{
         Engine: r,
         Port:   port,

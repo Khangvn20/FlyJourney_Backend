@@ -6,6 +6,7 @@ import (
 )
 type FlightService interface {
 	CreateFlightClasses(flightID int, classes []request.FlightClassRequest) (*response.Response, error)
+	BatchCreateFlights(request *request.BatchCreateFlightRequest) *response.Response
 	CreateFlight(request *request.CreateFlightRequest) *response.Response
 	GetFlightByID(flightID int) *response.Response
 	GetAllFlights(page, limit int) *response.Response

@@ -37,6 +37,26 @@ func (c *FlightController) CreateFlight(ctx *gin.Context) {
     
     ctx.JSON(statusCode, result)
 }
+func (c *FlightController) BatchCreateFlights(ctx *gin.Context) {
+    var req request.BatchCreateFlightRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+        })
+        return
+    }
+
+    result := c.flightService.BatchCreateFlights(&req)
+
+    statusCode := http.StatusOK
+    if !result.Status {
+        statusCode = http.StatusBadRequest
+    }
+
+    ctx.JSON(statusCode, result)
+}
 func (c *FlightController) CreateFlightClasses(ctx *gin.Context) {
      flightIDStr := ctx.Param("id")
     flightID, err := strconv.Atoi(flightIDStr)

@@ -5,6 +5,7 @@ import (
     "encoding/json"
     "github.com/redis/go-redis/v9"
     "time"
+    "errors"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
 )
 
@@ -54,4 +55,34 @@ func (s *redisService) Exists(key string) (bool, error) {
         return false, err
     }
     return val > 0, nil
+}
+func (s *redisService) TryLock(key string, value string, expiration time.Duration) (bool, error) {
+    ctx := context.Background()
+    success, err := s.client.SetNX(ctx, key, value, expiration).Result()
+    if err != nil {
+        return false, err
+    }
+    return success, nil
+}
+func (s *redisService) ReleaseLock(key string, value string) error {
+    ctx := context.Background()
+    
+  
+    script := `
+        if redis.call("GET", KEYS[1]) == ARGV[1] then
+            return redis.call("DEL", KEYS[1])
+        else
+            return 0
+        end
+    `
+    
+    result, err := s.client.Eval(ctx, script, []string{key}, value).Result()
+    if err != nil {
+        return err
+    }
+    if result.(int64) == 0 {
+        return errors.New("lock not found or not owned by caller")
+    }
+    
+    return nil
 }
