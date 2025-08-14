@@ -22,13 +22,56 @@ func NewBookingService(bookingRepo repository.BookingRepository, redisService se
         redisService: redisService,
     }
 }
+
+//Rate limit booking
+func (s *bookingService) RateLimitBooking(userID int64) *response.Response {
+	key := fmt.Sprintf("booking_rate_limit:%d", userID)
+    limit := 5
+    ttl := 180
+    count, err :=s.redisService.Incr(key)
+    if err !=nil{
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Error incrementing rate limit: %v", err),
+        }
+    }
+    if count == 1 {
+        if err :=s.redisService.Expire(key, time.Duration(ttl) * time.Second); err != nil {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InternalError,
+                ErrorMessage: fmt.Sprintf("Error setting rate limit: %v", err),
+            }
+        }
+    }
+
+     if count > int64(limit) {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.RateLimitExceeded,
+            ErrorMessage: fmt.Sprintf("Rate limit exceeded: %d requests per minute", limit),
+        }
+    }
+
+    return nil
+}
 func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *response.Response {
+    //Check rate limit
+    rateLimitResponse := s.RateLimitBooking(req.UserID)
+    if rateLimitResponse != nil {
+        return rateLimitResponse
+    }
+
 	var lockedKeys []string
     lockValue := fmt.Sprintf("user:%d", req.UserID)
 
     passengerCountByClass := make(map[int64]int)
 	for _, detail := range req.Details {
         passengerCountByClass[detail.FlightClassID]++
+        if detail.ReturnFlightClassID != nil {
+            passengerCountByClass[*detail.ReturnFlightClassID]++
+        }
     }
  for flightClassID := range passengerCountByClass {
         lockKey := fmt.Sprintf("booking_lock:class:%d", flightClassID)
@@ -107,6 +150,7 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
     booking := &dto.Booking{
         UserID:         req.UserID,
         FlightID:       req.FlightID,
+        ReturnFlightID: req.ReturnFlightID,
         ContactEmail:   req.ContactEmail,
         ContactPhone:   req.ContactPhone,
         ContactAddress: req.ContactAddress,
@@ -143,6 +187,7 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
             PassengerAge:    detail.PassengerAge,
             PassengerGender: detail.PassengerGender,
             FlightClassID:   detail.FlightClassID,
+            ReturnFlightClassID: detail.ReturnFlightClassID,
             Price:           detail.Price,
             LastName:        detail.LastName,
             FirstName:       detail.FirstName,
@@ -191,5 +236,43 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
         ErrorCode:    error_code.Success,
         ErrorMessage: "Đặt chỗ thành công",
         Data:         createdBooking,
+    }
+}
+//Worker 2h expire bookings
+func (s *bookingService) CancelExpiredBookings() *response.Response {
+    expiredBookingIDs, err := s.bookingRepo.GetExpiredBookingIDs()
+    if err != nil {
+        log.Printf("Error fetching expired booking IDs: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Lỗi lấy danh sách các đặt chỗ quá hạn: %v", err),
+        }
+    }
+
+    if len(expiredBookingIDs) == 0 {
+        log.Println("No expired bookings found to cancel")
+        return &response.Response{
+            Status:       true,
+            ErrorCode:    error_code.Success,
+            ErrorMessage: "Không có đặt chỗ quá hạn để hủy",
+        }
+    }
+    canceledBookingIDs, err := s.bookingRepo.CancelBookings(expiredBookingIDs)
+    if err != nil {
+        log.Printf("Error canceling expired bookings: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Lỗi hủy các đặt chỗ quá hạn: %v", err),
+        }
+    }
+
+    log.Printf("Canceled %d expired bookings: %v", len(canceledBookingIDs), canceledBookingIDs)
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: fmt.Sprintf("Hủy thành công %d đặt chỗ quá hạn", len(canceledBookingIDs)),
+        Data:         canceledBookingIDs,
     }
 }

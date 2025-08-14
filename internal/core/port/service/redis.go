@@ -10,4 +10,6 @@ type RedisService interface {
     Exists(key string) (bool, error)
     TryLock(key string, value string, expiration time.Duration) (bool, error)
     ReleaseLock(key string,value string) error
+    Incr(key string) (int64, error)
+    Expire(key string, expiration time.Duration) error
 }

@@ -14,6 +14,7 @@ const (
 	NOTFOUND       ErrorCode = "NOT_FOUND"
 	InsufficientSeats ErrorCode = "INSUFFICIENT_SEATS"
 	NoAvailableSeats ErrorCode = "NO_AVAILABLE_SEATS"
+	RateLimitExceeded ErrorCode = "RATE_LIMIT_EXCEEDED"
 )
 
 // error message
