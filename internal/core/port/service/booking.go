@@ -7,4 +7,5 @@ import (
 
 type BookingService interface {
 	CreateBooking(req *request.CreateBookingRequest) *response.Response
+	CancelExpiredBookings() *response.Response
 }

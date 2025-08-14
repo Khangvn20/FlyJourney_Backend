@@ -105,6 +105,16 @@ func NewHTTPServer(port int) (*Server, error) {
     router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
     router.FlightRoutes(apiV1, flightController, middleware.AuthMiddleware(tokenService))
     router.BookingRoutes(apiV1, bookingController, middleware.AuthMiddleware(tokenService))
+    log.Println("Initializing worker to delete expired bookings...")
+    go func() {
+        ticker := time.NewTicker(5 * time.Minute)
+        defer ticker.Stop()
+        for range ticker.C {
+            log.Printf("Running worker to delete expired bookings")
+            bookingService.CancelExpiredBookings()
+        }
+    }()
+    
     return &Server{
         Engine: r,
         Port:   port,

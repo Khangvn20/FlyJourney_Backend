@@ -29,6 +29,9 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
     passengerCountByClass := make(map[int64]int)
 	for _, detail := range req.Details {
         passengerCountByClass[detail.FlightClassID]++
+        if detail.ReturnFlightClassID != nil {
+            passengerCountByClass[*detail.ReturnFlightClassID]++
+        }
     }
  for flightClassID := range passengerCountByClass {
         lockKey := fmt.Sprintf("booking_lock:class:%d", flightClassID)
@@ -107,6 +110,7 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
     booking := &dto.Booking{
         UserID:         req.UserID,
         FlightID:       req.FlightID,
+        ReturnFlightID: req.ReturnFlightID,
         ContactEmail:   req.ContactEmail,
         ContactPhone:   req.ContactPhone,
         ContactAddress: req.ContactAddress,
@@ -143,6 +147,7 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
             PassengerAge:    detail.PassengerAge,
             PassengerGender: detail.PassengerGender,
             FlightClassID:   detail.FlightClassID,
+            ReturnFlightClassID: detail.ReturnFlightClassID,
             Price:           detail.Price,
             LastName:        detail.LastName,
             FirstName:       detail.FirstName,
@@ -191,5 +196,43 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
         ErrorCode:    error_code.Success,
         ErrorMessage: "Đặt chỗ thành công",
         Data:         createdBooking,
+    }
+}
+//Worker 2h expire bookings
+func (s *bookingService) CancelExpiredBookings() *response.Response {
+    expiredBookingIDs, err := s.bookingRepo.GetExpiredBookingIDs()
+    if err != nil {
+        log.Printf("Error fetching expired booking IDs: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Lỗi lấy danh sách các đặt chỗ quá hạn: %v", err),
+        }
+    }
+
+    if len(expiredBookingIDs) == 0 {
+        log.Println("No expired bookings found to cancel")
+        return &response.Response{
+            Status:       true,
+            ErrorCode:    error_code.Success,
+            ErrorMessage: "Không có đặt chỗ quá hạn để hủy",
+        }
+    }
+    canceledBookingIDs, err := s.bookingRepo.CancelBookings(expiredBookingIDs)
+    if err != nil {
+        log.Printf("Error canceling expired bookings: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Lỗi hủy các đặt chỗ quá hạn: %v", err),
+        }
+    }
+
+    log.Printf("Canceled %d expired bookings: %v", len(canceledBookingIDs), canceledBookingIDs)
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: fmt.Sprintf("Hủy thành công %d đặt chỗ quá hạn", len(canceledBookingIDs)),
+        Data:         canceledBookingIDs,
     }
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
 	"github.com/jackc/pgx/v5"
+    "log"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 type bookingRepository struct {
@@ -71,17 +72,29 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
         if availableSeats < 1 {
             return nil, fmt.Errorf("no available seats for flight class %d", detail.FlightClassID)
         }
+        if detail.ReturnFlightClassID != nil {
+            err :=tx.QueryRow(ctx, lockQuery, *detail.ReturnFlightClassID).Scan(&availableSeats)
+            if err != nil {
+                if errors.Is(err, pgx.ErrNoRows) {
+                    return nil, fmt.Errorf("return flight class with ID %d not found", *detail.ReturnFlightClassID)
+                }
+                return nil, fmt.Errorf("error locking return flight class: %w", err)
+            }
+            if availableSeats < 1 {
+            return nil, fmt.Errorf("no available seats for return flight class %d", *detail.ReturnFlightClassID)
+            }
+        }
     }
 	 bookingQuery := `
         INSERT INTO bookings (
-            user_id, flight_id, booking_date, contact_email, 
+            user_id, flight_id, return_flight_id, booking_date, contact_email, 
             contact_phone, contact_address, note, status, 
             total_price, created_at, updated_at, check_in_status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING booking_id`
 
     err = tx.QueryRow(ctx, bookingQuery,
-        booking.UserID, booking.FlightID, booking.BookingDate,
+        booking.UserID, booking.FlightID, booking.ReturnFlightID, booking.BookingDate,
         booking.ContactEmail, booking.ContactPhone, booking.ContactAddress,
         booking.Note, booking.Status, booking.TotalPrice,
         booking.CreatedAt, booking.UpdatedAt, booking.CheckInStatus).Scan(&booking.BookingID)
@@ -94,7 +107,7 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
 
         detailQuery := `
             INSERT INTO booking_details (
-                booking_id, passenger_age, passenger_gender, flight_class_id, 
+                booking_id, passenger_age, passenger_gender, flight_class_id,return_flight_class_id,
                 price, last_name, first_name, date_of_birth, id_type, 
                 id_number, expiry_date, issuing_country, nationality
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
@@ -102,7 +115,7 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
 
         err = tx.QueryRow(ctx, detailQuery,
             detail.BookingID, detail.PassengerAge, detail.PassengerGender,
-            detail.FlightClassID, detail.Price, detail.LastName, detail.FirstName,
+            detail.FlightClassID, detail.ReturnFlightClassID, detail.Price, detail.LastName, detail.FirstName,
             detail.DateOfBirth, detail.IDType, detail.IDNumber, detail.ExpiryDate,
             detail.IssuingCountry, detail.Nationality).Scan(&detail.BookingDetailID)
         
@@ -119,6 +132,12 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
         _, err = tx.Exec(ctx, updateSeatsQuery, detail.FlightClassID)
         if err != nil {
             return nil, fmt.Errorf("error updating available seats: %w", err)
+        }
+        if err != nil {
+            _, err = tx.Exec(ctx, updateSeatsQuery, *detail.ReturnFlightClassID)
+            if err != nil {
+                return nil, fmt.Errorf("error updating available seats for return flight class: %w", err)
+            }
         }
 		booking.Details[i] = detail // Cập nhật detail đã có booking_detail_id
 	}
@@ -161,4 +180,75 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
     }
 	return booking, nil
    
+}
+func (r *bookingRepository) GetBookingByID(bookingID int64) (*dto.Booking, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    query :=`SELECT * FROM bookings WHERE booking_id = $1`
+    var booking dto.Booking
+    err := r.db.QueryRow(ctx, query, bookingID).Scan(&booking.BookingID, &booking.UserID, &booking.FlightID, &booking.BookingDate,
+        &booking.ContactEmail, &booking.ContactPhone, &booking.ContactAddress, &booking.Note, &booking.Status,
+        &booking.TotalPrice, &booking.CheckInStatus)
+    if err != nil {
+        return nil, fmt.Errorf("error getting booking by ID: %w", err)
+    }
+    return &booking, nil
+}
+
+func (r *bookingRepository) GetExpiredBookingIDs() ([]int64, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT booking_id
+        FROM bookings
+        WHERE status = 'pending_payment' AND created_at <= NOW() - INTERVAL '2 hours'
+    `
+
+    rows, err := r.db.Query(ctx, query)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching expired booking IDs: %w", err)
+    }
+    defer rows.Close()
+
+    var expiredBookingIDs []int64
+    for rows.Next() {
+        var bookingID int64
+        if err := rows.Scan(&bookingID); err != nil {
+            return nil, fmt.Errorf("error scanning expired booking ID: %w", err)
+        }
+        expiredBookingIDs = append(expiredBookingIDs, bookingID)
+    }
+
+    return expiredBookingIDs, nil
+}
+
+func (r *bookingRepository) CancelBookings(bookingIDs []int64) ([]int64, error) {
+    log.Printf("Canceling bookings with IDs: %v", bookingIDs)
+
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    query := `
+        DELETE FROM bookings
+        WHERE booking_id = ANY($1) AND status = 'pending_payment'
+        RETURNING booking_id
+    `
+
+    rows, err := r.db.Query(ctx, query, bookingIDs)
+    if err != nil {
+        return nil, fmt.Errorf("error canceling bookings: %w", err)
+    }
+    defer rows.Close()
+
+    var canceledBookingIDs []int64
+    for rows.Next() {
+        var bookingID int64
+        if err := rows.Scan(&bookingID); err != nil {
+            return nil, fmt.Errorf("error scanning canceled booking ID: %w", err)
+        }
+        canceledBookingIDs = append(canceledBookingIDs, bookingID)
+    }
+
+    return canceledBookingIDs, nil
 }

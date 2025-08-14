@@ -6,9 +6,10 @@ import (
 type BookingRepository interface {
     // Create booking
     CreateBooking(booking *dto.Booking) (*dto.Booking, error)
-    
+    CancelBookings(bookingIDs []int64) ([]int64, error)
     // Get bookings
-  //  GetBookingByID(bookingID int64) (*dto.Booking, error)
+    GetExpiredBookingIDs() ([]int64, error) 
+    GetBookingByID(bookingID int64) (*dto.Booking, error)
     //GetBookingsByUserID(userID int64, page, limit int) ([]*dto.Booking, int, error)
    // GetPendingPaymentBookings(timeThreshold time.Time) ([]int64, error)
     

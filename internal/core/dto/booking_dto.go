@@ -8,6 +8,7 @@ type Booking struct {
 	BookingID      int64            `json:"booking_id"`
 	UserID         int64            `json:"user_id"`
 	FlightID       int64            `json:"flight_id"`
+	ReturnFlightID *int64           `json:"return_flight_id"`
 	BookingDate    time.Time        `json:"booking_date"`
 	ContactEmail   string           `json:"contact_email"`    // Email liên hệ
 	ContactPhone   string           `json:"contact_phone"`    // Số điện thoại liên hệ
@@ -30,6 +31,7 @@ type BookingDetail struct {
 	PassengerAge    int        `json:"passenger_age"`
 	PassengerGender string     `json:"passenger_gender"`
 	FlightClassID   int64      `json:"flight_class_id"`
+	ReturnFlightClassID *int64  `json:"return_flight_class_id"`
 	SeatID          *int64     `json:"seat_id"`             // Optional: nil if not assigned yet
 	Price           float64    `json:"price"`
 	LastName        string     `json:"last_name"`
