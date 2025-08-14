@@ -86,3 +86,19 @@ func (s *redisService) ReleaseLock(key string, value string) error {
     
     return nil
 }
+func (s *redisService) Incr(key string) (int64, error) {
+    ctx := context.Background()
+    return s.client.Incr(ctx, key).Result()
+}
+
+func (s *redisService) Expire(key string, expiration time.Duration) error {
+    ctx := context.Background()
+    success, err := s.client.Expire(ctx, key, expiration).Result()
+    if err != nil {
+        return err
+    }
+    if !success {
+        return errors.New("failed to set expiration for key")
+    }
+    return nil
+}

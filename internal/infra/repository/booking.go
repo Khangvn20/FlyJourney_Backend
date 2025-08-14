@@ -90,7 +90,7 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
             user_id, flight_id, return_flight_id, booking_date, contact_email, 
             contact_phone, contact_address, note, status, 
             total_price, created_at, updated_at, check_in_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING booking_id`
 
     err = tx.QueryRow(ctx, bookingQuery,
@@ -110,7 +110,7 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
                 booking_id, passenger_age, passenger_gender, flight_class_id,return_flight_class_id,
                 price, last_name, first_name, date_of_birth, id_type, 
                 id_number, expiry_date, issuing_country, nationality
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             RETURNING booking_detail_id`
 
         err = tx.QueryRow(ctx, detailQuery,
@@ -128,17 +128,16 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
             UPDATE flight_classes 
             SET available_seats = available_seats - 1 
             WHERE flight_class_id = $1`
-
+        
         _, err = tx.Exec(ctx, updateSeatsQuery, detail.FlightClassID)
         if err != nil {
             return nil, fmt.Errorf("error updating available seats: %w", err)
         }
-        if err != nil {
-            _, err = tx.Exec(ctx, updateSeatsQuery, *detail.ReturnFlightClassID)
-            if err != nil {
-                return nil, fmt.Errorf("error updating available seats for return flight class: %w", err)
-            }
-        }
+        if detail.ReturnFlightClassID != nil {
+    if _, err = tx.Exec(ctx, updateSeatsQuery, *detail.ReturnFlightClassID); err != nil {
+        return nil, fmt.Errorf("error updating available seats for return flight class %d: %w", *detail.ReturnFlightClassID, err)
+    }
+}
 		booking.Details[i] = detail // Cập nhật detail đã có booking_detail_id
 	}
     if booking.Ancillaries != nil && len(booking.Ancillaries) > 0 { 

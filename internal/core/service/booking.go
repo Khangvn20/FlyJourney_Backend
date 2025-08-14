@@ -22,7 +22,47 @@ func NewBookingService(bookingRepo repository.BookingRepository, redisService se
         redisService: redisService,
     }
 }
+
+//Rate limit booking
+func (s *bookingService) RateLimitBooking(userID int64) *response.Response {
+	key := fmt.Sprintf("booking_rate_limit:%d", userID)
+    limit := 5
+    ttl := 180
+    count, err :=s.redisService.Incr(key)
+    if err !=nil{
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Error incrementing rate limit: %v", err),
+        }
+    }
+    if count == 1 {
+        if err :=s.redisService.Expire(key, time.Duration(ttl) * time.Second); err != nil {
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.InternalError,
+                ErrorMessage: fmt.Sprintf("Error setting rate limit: %v", err),
+            }
+        }
+    }
+
+     if count > int64(limit) {
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.RateLimitExceeded,
+            ErrorMessage: fmt.Sprintf("Rate limit exceeded: %d requests per minute", limit),
+        }
+    }
+
+    return nil
+}
 func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *response.Response {
+    //Check rate limit
+    rateLimitResponse := s.RateLimitBooking(req.UserID)
+    if rateLimitResponse != nil {
+        return rateLimitResponse
+    }
+
 	var lockedKeys []string
     lockValue := fmt.Sprintf("user:%d", req.UserID)
 
