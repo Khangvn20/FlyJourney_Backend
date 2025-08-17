@@ -77,11 +77,12 @@ func NewHTTPServer(port int) (*Server, error) {
         return nil, fmt.Errorf("database ping failed: %v", err)
     }
    //Intitiallize config
-
+   momoConfig := config.NewMomoConfig()
     // Initialize repository
     userRepo := repository.NewUserRepository(db)
     bookingRepo := repository.NewBookingRepository(db.GetPool())
     flightRepo := repository.NewFlightRepository(db.GetPool())
+    paymentRepo := repository.NewPaymentRepository(db.GetPool())
     // Initialize services
     redisService := service.NewRedisService(redisClient)
     bookingService := service.NewBookingService(bookingRepo,redisService)
@@ -89,12 +90,13 @@ func NewHTTPServer(port int) (*Server, error) {
      tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
     flightService := service.NewFlightService(flightRepo)
-
+    paymentService := service.NewPaymentService(momoConfig, bookingRepo, paymentRepo)
 
     // Initialize controller
     bookingController := controller.NewBookingController(bookingService)
     userController := controller.NewUserController(userService)
     flightController := controller.NewFlightController(flightService)
+    paymentController := controller.NewPaymentController(paymentService)
 
 
     // Setup router
@@ -105,15 +107,9 @@ func NewHTTPServer(port int) (*Server, error) {
     router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
     router.FlightRoutes(apiV1, flightController, middleware.AuthMiddleware(tokenService))
     router.BookingRoutes(apiV1, bookingController, middleware.AuthMiddleware(tokenService))
-    log.Println("Initializing worker to delete expired bookings...")
-    go func() {
-        ticker := time.NewTicker(5 * time.Minute)
-        defer ticker.Stop()
-        for range ticker.C {
-            log.Printf("Running worker to delete expired bookings")
-            bookingService.CancelExpiredBookings()
-        }
-    }()
+    router.PaymentRoutes(apiV1, paymentController, middleware.AuthMiddleware(tokenService))
+
+
     
     return &Server{
         Engine: r,

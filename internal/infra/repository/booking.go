@@ -251,3 +251,22 @@ func (r *bookingRepository) CancelBookings(bookingIDs []int64) ([]int64, error) 
 
     return canceledBookingIDs, nil
 }
+func(r *bookingRepository) UpdateStatusConfirm(bookingID int64) (*dto.Booking, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        UPDATE bookings
+        SET status = 'confirmed', updated_at = NOW()
+        WHERE booking_id = $1
+        RETURNING booking_id, user_id, status, updated_at
+    `
+
+    var booking dto.Booking
+    err := r.db.QueryRow(ctx, query, bookingID).Scan(&booking.BookingID, &booking.UserID, &booking.Status, &booking.UpdatedAt)
+    if err != nil {
+        return nil, fmt.Errorf("error updating booking status: %w", err)
+    }
+    
+    return &booking, nil
+}
