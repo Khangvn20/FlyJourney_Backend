@@ -77,7 +77,7 @@ func NewHTTPServer(port int) (*Server, error) {
         return nil, fmt.Errorf("database ping failed: %v", err)
     }
    //Intitiallize config
-
+   momoConfig := config.NewMomoConfig()
     // Initialize repository
     userRepo := repository.NewUserRepository(db)
     bookingRepo := repository.NewBookingRepository(db.GetPool())
@@ -89,12 +89,13 @@ func NewHTTPServer(port int) (*Server, error) {
      tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
     flightService := service.NewFlightService(flightRepo)
-
+    paymentSerive := service.NewPaymentService(momoConfig)
 
     // Initialize controller
     bookingController := controller.NewBookingController(bookingService)
     userController := controller.NewUserController(userService)
     flightController := controller.NewFlightController(flightService)
+    paymentController := controller.NewPaymentController(paymentSerive)
 
 
     // Setup router
@@ -105,15 +106,9 @@ func NewHTTPServer(port int) (*Server, error) {
     router.UserRoutes(apiV1, userController, middleware.AuthMiddleware(tokenService))
     router.FlightRoutes(apiV1, flightController, middleware.AuthMiddleware(tokenService))
     router.BookingRoutes(apiV1, bookingController, middleware.AuthMiddleware(tokenService))
+    router.PaymentRoutes(apiV1, paymentController)
     log.Println("Initializing worker to delete expired bookings...")
-    go func() {
-        ticker := time.NewTicker(5 * time.Minute)
-        defer ticker.Stop()
-        for range ticker.C {
-            log.Printf("Running worker to delete expired bookings")
-            bookingService.CancelExpiredBookings()
-        }
-    }()
+
     
     return &Server{
         Engine: r,

@@ -15,6 +15,8 @@ const (
 	InsufficientSeats ErrorCode = "INSUFFICIENT_SEATS"
 	NoAvailableSeats ErrorCode = "NO_AVAILABLE_SEATS"
 	RateLimitExceeded ErrorCode = "RATE_LIMIT_EXCEEDED"
+	SignatureError     ErrorCode = "SIGNATURE_ERROR"
+	PaymentFailed      ErrorCode = "PAYMENT_FAILED"
 )
 
 // error message
