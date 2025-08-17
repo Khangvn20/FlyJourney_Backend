@@ -75,3 +75,6 @@ type GetFlightsByDateRequest struct {
     SortOrder string `json:"sort_order,omitempty"`           
 }
 
+type BatchCreateFlightRequest struct {
+    Flights []CreateFlightRequest `json:"flights" binding:"required,dive"`
+}
