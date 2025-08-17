@@ -5,23 +5,30 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
-    "github.com/gin-gonic/gin"
-	"encoding/json"
 	"net/http"
+    "strconv"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/repository"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/infra/config"
+	"github.com/gin-gonic/gin"
 )
 type paymentService struct {
-	momoConfig *config.MomoConfig
+	momoConfig      *config.MomoConfig
+	bookingRepository  repository.BookingRepository
+    paymentRepository   repository.PaymentRepository
 }
-func NewPaymentService(momoConfig *config.MomoConfig) service.PaymentService {
+func NewPaymentService(momoConfig *config.MomoConfig, bookingRepo repository.BookingRepository, paymentRepo repository.PaymentRepository) service.PaymentService {
     return &paymentService{
-        momoConfig: momoConfig,
+        momoConfig:        momoConfig,
+        bookingRepository: bookingRepo,
+        paymentRepository: paymentRepo,
     }
 }
 func (s *paymentService) GenerateMomoSignature(req *request.MomoRequest) response.Response {
@@ -74,8 +81,33 @@ func (s *paymentService) CreateMomoPayment(req *request.MomoRequest) response.Re
         req.RedirectUrl = s.momoConfig.RedirectUrl
     }
 
-    // Log request để debug
-    log.Printf("Request before signature: %+v", req)
+    bookingID, err := strconv.ParseInt(req.BookingID, 10, 64)
+    if err != nil {
+        return response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: fmt.Sprintf("Invalid booking_id: %v", err),
+        }
+    }
+    // add create payment
+    payment := &dto.Payment {
+        BookingID : bookingID,
+        Amount    : req.Amount,
+        PaymentMethod : "Momo",
+        Status: "pending",
+        TransactionID: req.OrderId,
+        PaidAt: nil,
+    }
+
+    createdPayment, err := s.paymentRepository.CreatePayment(payment)
+    if err != nil {
+        return response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Error creating payment: %v", err),
+        }
+    }
+
     signatureResponse := s.GenerateMomoSignature(req)
     if !signatureResponse.Status {
         return signatureResponse 
@@ -118,20 +150,61 @@ func (s *paymentService) CreateMomoPayment(req *request.MomoRequest) response.Re
        Status:       true,
        ErrorCode:    error_code.Success,
        ErrorMessage: error_code.SuccessErrMsg,
-       Data:        momoResponse,
-   }
+       Data: map[string]interface{}{
+            "momoResponse":  momoResponse,
+            "createdPayment": map[string]interface{}{ 
+            "payment_id":     createdPayment.PaymentID,
+            "booking_id":     createdPayment.BookingID,
+            "amount":         createdPayment.Amount,
+            "status":         createdPayment.Status,
+            "transaction_id": createdPayment.TransactionID,
+            "payment_method": createdPayment.PaymentMethod,
+            "paid_at":        createdPayment.PaidAt,
+        },
+   },
 }
-// Private method - không cần khai báo trong interface
+}
 func (s *paymentService) handleSuccessfulPayment(req *request.MomoCallbackRequest) response.Response {
     // Log successful payment
     log.Printf("Payment successful - OrderID: %s, TransID: %s, Amount: %s", 
                req.OrderId, req.TransId, req.Amount)
-    
-    // TODO: Update booking status via BookingService
-    // if s.bookingService != nil {
-    //     s.bookingService.UpdateBookingStatus(req.OrderId, "paid")
-    // }
-    
+    paymentID, err := s.paymentRepository.GetPaymentIDByTransactionID(req.OrderId)
+    if err != nil {
+        return response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: fmt.Sprintf("Failed to find payment for transaction ID %s: %v", req.OrderId, err),
+        }
+    }
+
+    updatedPayment, err := s.paymentRepository.UpdatePaymentStatus(paymentID, "success")
+    if err != nil {
+        return response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Failed to update payment status: %v", err),
+        }
+    }
+
+
+    bookingID, err := s.paymentRepository.GetBookingIDByTransactionID(req.OrderId)
+    if err != nil {
+        return response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: fmt.Sprintf("Failed to find booking ID for transaction ID %s: %v", req.OrderId, err),
+        }
+    }
+
+    updatedBooking, err := s.bookingRepository.UpdateStatusConfirm(bookingID)
+    if err != nil {
+    return response.Response{
+        Status:       false,
+        ErrorCode:    error_code.InternalError,
+        ErrorMessage: fmt.Sprintf("Failed to update booking status: %v", err),
+    }
+}
+
     return response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
@@ -144,21 +217,34 @@ func (s *paymentService) handleSuccessfulPayment(req *request.MomoCallbackReques
             "message":      req.Message,
             "payType":      req.PayType,
             "responseTime": req.ResponseTime,
+            "payment":      updatedPayment,
+            "booking":      updatedBooking,
         },
     }
 }
 
-// Private method - không cần khai báo trong interface
 func (s *paymentService) handleFailedPayment(req *request.MomoCallbackRequest, reason string) response.Response {
     // Log failed payment
     log.Printf("Payment failed - OrderID: %s, Reason: %s, ResultCode: %d", 
                req.OrderId, reason, req.ResultCode)
-    
-    // TODO: Update booking status via BookingService
-    // if s.bookingService != nil {
-    //     s.bookingService.UpdateBookingStatus(req.OrderId, "payment_failed")
-    // }
-    
+    paymentID, err := s.paymentRepository.GetPaymentIDByTransactionID(req.OrderId)
+    if err != nil {
+        return response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: fmt.Sprintf("Failed to find payment for transaction ID %s: %v", req.OrderId, err),
+        }
+    }
+
+    updatedPayment, err := s.paymentRepository.UpdatePaymentStatus(paymentID, "failed")
+    if err != nil {
+        return response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("Failed to update payment status: %v", err),
+        }
+    }
+
     return response.Response{
         Status:       false,
         ErrorCode:    error_code.PaymentFailed,
@@ -168,34 +254,48 @@ func (s *paymentService) handleFailedPayment(req *request.MomoCallbackRequest, r
             "resultCode":   req.ResultCode,
             "message":      req.Message,
             "reason":       reason,
+            "payment":      updatedPayment,
             "responseTime": req.ResponseTime,
         },
     }
 }
 
-// Private method - không cần khai báo trong interface
 func (s *paymentService) verifyMomoCallbackSignature(req *request.MomoCallbackRequest) bool {
-    rawData := fmt.Sprintf("accessKey=%s&amount=%s&extraData=%s&message=%s&orderId=%s&orderInfo=%s&orderType=%s&partnerCode=%s&payType=%s&requestId=%s&responseTime=%s&resultCode=%d&transId=%s",
-        s.momoConfig.AccessKey, req.Amount, req.ExtraData, req.Message,
-        req.OrderId, req.OrderInfo, req.OrderType, req.PartnerCode,
-        req.PayType, req.RequestId, req.ResponseTime, req.ResultCode, req.TransId)
-
+    // Từ verifyMomoCallbackSignature
+    rawData := fmt.Sprintf("accessKey=%s&amount=%d&extraData=%s&message=%s&orderId=%s&orderInfo=%s&orderType=%s&partnerCode=%s&payType=%s&requestId=%s&responseTime=%d&resultCode=%d&transId=%d",
+        s.momoConfig.AccessKey,
+        req.Amount,      
+        req.ExtraData,
+        req.Message,
+        req.OrderId,
+        req.OrderInfo,
+        req.OrderType,
+        req.PartnerCode,
+        req.PayType,
+        req.RequestId,
+        req.ResponseTime,  
+        req.ResultCode,
+        req.TransId)       
+    log.Printf("Callback raw data: %s", rawData)
+    log.Printf("Received signature: %s", req.Signature)
     h := hmac.New(sha256.New, []byte(s.momoConfig.SecretKey))
-    h.Write([]byte(rawData))
+    h.Write([]byte(rawData))  
     expectedSignature := hex.EncodeToString(h.Sum(nil))
-
     return expectedSignature == req.Signature
 }
 func (s *paymentService) HandleMomoCallback(req *request.MomoCallbackRequest) response.Response {
     // Verify callback signature
+    log.Printf("MoMo Callback received: %+v", req)
     if !s.verifyMomoCallbackSignature(req) {
+       
         return response.Response{
             Status:       false,
             ErrorCode:    error_code.SignatureError,
             ErrorMessage: "Invalid callback signature",
         }
+        
     }
-
+    
     // Process payment result based on resultCode
     switch req.ResultCode {
     case 0:
@@ -218,7 +318,7 @@ func (s *paymentService) HandleMomoCallback(req *request.MomoCallbackRequest) re
         return s.handleFailedPayment(req, fmt.Sprintf("Payment failed with code: %d", req.ResultCode))
     }
 }
-// Trong file internal/core/service/payment.go
+
 func (s *paymentService) HandleMomoSuccess(ctx *gin.Context) response.Response {
     // Extract query parameters
     partnerCode := ctx.Query("partnerCode")

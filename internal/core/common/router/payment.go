@@ -4,11 +4,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func PaymentRoutes(rg *gin.RouterGroup, paymentController *controller.PaymentController) {
+func PaymentRoutes(rg *gin.RouterGroup, paymentController *controller.PaymentController,authMiddleware gin.HandlerFunc) {
 	paymentRoutes := rg.Group("/payment")
 	{
-		paymentRoutes.POST("/momo", paymentController.CreatePayment)
-		paymentRoutes.GET("/momo/success", paymentController.HandleMomoSuccess)
-		paymentRoutes.POST("/momo/callback", paymentController.HandleMomoCallback)
+		paymentRoutes.POST("/momo",authMiddleware ,paymentController.CreatePayment)
+
 	}
 }

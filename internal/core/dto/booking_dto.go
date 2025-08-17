@@ -44,16 +44,6 @@ type BookingDetail struct {
 	Nationality     string     `json:"nationality"`
 	//SeatAssignedAt  *time.Time `json:"seat_assigned_at"`    // New: Timestamp when seat is assigned (nil if not yet)
 }
-
-type Payment struct {
-	PaymentID     int64     `json:"payment_id"`
-	BookingID     int64     `json:"booking_id"`
-	Amount        float64   `json:"amount"`
-	PaymentMethod string    `json:"payment_method"`
-	PaidAt        time.Time `json:"paid_at"`
-	Status        string    `json:"status"`
-	TransactionID string    `json:"transaction_id"`
-}
 type Ancillary struct {
 	AncillaryID   int64     `json:"ancillary_id"`   // Unique ID for this add-on instance
 	BookingDetailID  int64     `json:"booking_detail_id"`

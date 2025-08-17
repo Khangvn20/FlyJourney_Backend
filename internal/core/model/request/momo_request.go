@@ -1,6 +1,7 @@
 package request
 
 type MomoRequest struct {
+    BookingID   string  `json:"booking_id" binding:"required"`
 	PartnerCode string `json:"partnerCode"`
 	AccessKey   string `json:"accessKey"`
 	RequestId   string `json:"requestId"`
@@ -17,14 +18,14 @@ type MomoCallbackRequest struct {
     PartnerCode     string `json:"partnerCode" binding:"required"`
     OrderId         string `json:"orderId" binding:"required"`
     RequestId       string `json:"requestId" binding:"required"`
-    Amount          string `json:"amount" binding:"required"`
+    Amount          int64 `json:"amount" binding:"required"`
     OrderInfo       string `json:"orderInfo"`
     OrderType       string `json:"orderType"`
-    TransId         string `json:"transId"`
+    TransId         int64 `json:"transId"`
     ResultCode      int    `json:"resultCode"`
     Message         string `json:"message"`
     PayType         string `json:"payType"`
-    ResponseTime    string `json:"responseTime"`
+    ResponseTime    int64 `json:"responseTime"`
     ExtraData       string `json:"extraData"`
     Signature       string `json:"signature" binding:"required"`
 }
