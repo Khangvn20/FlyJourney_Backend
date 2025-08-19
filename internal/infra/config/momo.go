@@ -19,7 +19,7 @@ func NewMomoConfig() *MomoConfig {
         AccessKey:  "F8BBA842ECF85",
         SecretKey:  "K951B6PE1waDMi640xX08PD3vg6EkVlz",
         Endpoint:    "https://test-payment.momo.vn/v2/gateway/api/create",
-        RedirectUrl: "http://localhost:3000/api/v1/payment/success",
-        IpnUrl:      "https://554303d5a5c6.ngrok-free.app/api/v1/payment/momo/callback",
+        RedirectUrl: "http://localhost:3030/my-bookings",
+        IpnUrl:      "https://4d3c40525af2.ngrok-free.app/api/v1/payment/momo/callback",
     }
 }

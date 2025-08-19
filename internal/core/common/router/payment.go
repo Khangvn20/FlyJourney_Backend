@@ -7,7 +7,7 @@ import (
 func PaymentRoutes(rg *gin.RouterGroup, paymentController *controller.PaymentController,authMiddleware gin.HandlerFunc) {
 	paymentRoutes := rg.Group("/payment")
 	{
-		paymentRoutes.POST("/momo",authMiddleware ,paymentController.CreatePayment)
-
+		paymentRoutes.POST("/momo",paymentController.CreatePayment)
+        paymentRoutes.POST("/momo/callback", paymentController.HandleMomoCallback)
 	}
 }

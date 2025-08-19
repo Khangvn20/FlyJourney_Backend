@@ -335,7 +335,6 @@ func (s *paymentService) HandleMomoSuccess(ctx *gin.Context) response.Response {
     extraData := ctx.Query("extraData")
     signature := ctx.Query("signature")
 
-    // Validate required fields
     if partnerCode == "" || orderId == "" || resultCode == "" {
         return response.Response{
             Status:       false,
@@ -360,7 +359,7 @@ func (s *paymentService) HandleMomoSuccess(ctx *gin.Context) response.Response {
                 "transId":      transId,
                 "amount":       amount,
                 "orderInfo":    orderInfo,
-                "orderType":    orderType,  // Sử dụng orderType ở đây
+                "orderType":    orderType, 
                 "resultCode":   resultCode,
                 "message":      message,
                 "payType":      payType,
