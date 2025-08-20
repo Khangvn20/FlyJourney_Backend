@@ -9,7 +9,7 @@ type MomoRequest struct {
 	OrderId     string `json:"orderId"`
 	OrderInfo   string `json:"orderInfo"`
 	RedirectUrl string `json:"redirectUrl"`
-	IpnUrl     string `json:"ipnUrl"`
+	IpnUrl      string `json:"ipnUrl"`
 	ExtraData   string `json:"extraData"`
 	RequestType string `json:"requestType"`
 	Signature   string `json:"signature"`
