@@ -128,3 +128,35 @@ func (r *paymentRepository) GetPaymentIDByTransactionID(transactionID string) (i
     
     return paymentID, nil
 }
+
+func (r *paymentRepository) GetPaymentByBookingID(bookingID int64) (*dto.Payment, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT payment_id, booking_id, amount, payment_method, status, transaction_id, paid_at
+        FROM payments
+        WHERE booking_id = $1
+        ORDER BY paid_at DESC
+        LIMIT 1
+    `
+
+    var payment dto.Payment
+    err := r.db.QueryRow(ctx, query, bookingID).Scan(
+        &payment.PaymentID,
+        &payment.BookingID,
+        &payment.Amount,
+        &payment.PaymentMethod,
+        &payment.Status,
+        &payment.TransactionID,
+        &payment.PaidAt,
+    )
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return nil, fmt.Errorf("payment not found for booking ID %d", bookingID)
+        }
+        return nil, fmt.Errorf("failed to get payment by booking ID: %v", err)
+    }
+
+    return &payment, nil
+}

@@ -398,7 +398,7 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
     flightClassesQuery := `
         SELECT fc.flight_class_id, fc.flight_id, fc.class, fc.base_price, fc.available_seats, 
                fc.total_seats, fc.base_price_child, fc.base_price_infant, fc.fare_class_code,
-               fcc.fare_class_code,fcc.cabin_class, fcc.refundable, fcc.changeable, fcc.baggage_kg, fcc.description
+               fcc.fare_class_code,fcc.cabin_class, fcc.refundable, fcc.changeable, fcc.baggage_kg, fcc.refund_change_policy,fcc.description
         FROM flight_classes fc
         LEFT JOIN fare_classes fcc ON fc.fare_class_code = fcc.fare_class_code
         WHERE fc.flight_id = $1
@@ -432,6 +432,7 @@ func (r *flightRepository) GetByID(id int) (*dto.Flight, []*dto.FlightClass, err
             &fareClass.Refundable,
             &fareClass.Changeable,
             &fareClass.Baggage_kg,
+            &fareClass.RefundChangePolicy,
             &fareClass.Description,
         ); err != nil {
             return &flight, nil, fmt.Errorf("error scanning flight class: %w", err)

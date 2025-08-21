@@ -4,6 +4,7 @@ import "time"
 type Flight struct {
     FlightID          int       `json:"flight_id"`
     AirlineID         int       `json:"airline_id"`
+    AirlineName      string    `json:"airline_name"`
     FlightNumber      string    `json:"flight_number"`
     DepartureAirport  string    `json:"departure_airport"`
     ArrivalAiportCode string    `json:"arrival_airport_code"`
