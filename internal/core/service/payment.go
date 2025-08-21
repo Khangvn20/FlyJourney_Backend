@@ -166,7 +166,7 @@ func (s *paymentService) CreateMomoPayment(req *request.MomoRequest) response.Re
 }
 func (s *paymentService) handleSuccessfulPayment(req *request.MomoCallbackRequest) response.Response {
     // Log successful payment
-    log.Printf("Payment successful - OrderID: %s, TransID: %s, Amount: %s", 
+    log.Printf("Payment successful - OrderID: %s, TransID: %d, Amount: %d", 
                req.OrderId, req.TransId, req.Amount)
     paymentID, err := s.paymentRepository.GetPaymentIDByTransactionID(req.OrderId)
     if err != nil {
@@ -335,7 +335,6 @@ func (s *paymentService) HandleMomoSuccess(ctx *gin.Context) response.Response {
     extraData := ctx.Query("extraData")
     signature := ctx.Query("signature")
 
-    // Validate required fields
     if partnerCode == "" || orderId == "" || resultCode == "" {
         return response.Response{
             Status:       false,
@@ -360,7 +359,7 @@ func (s *paymentService) HandleMomoSuccess(ctx *gin.Context) response.Response {
                 "transId":      transId,
                 "amount":       amount,
                 "orderInfo":    orderInfo,
-                "orderType":    orderType,  // Sử dụng orderType ở đây
+                "orderType":    orderType, 
                 "resultCode":   resultCode,
                 "message":      message,
                 "payType":      payType,

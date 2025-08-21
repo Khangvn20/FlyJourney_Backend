@@ -83,20 +83,23 @@ func NewHTTPServer(port int) (*Server, error) {
     bookingRepo := repository.NewBookingRepository(db.GetPool())
     flightRepo := repository.NewFlightRepository(db.GetPool())
     paymentRepo := repository.NewPaymentRepository(db.GetPool())
+    pnrRepo     :=repository.NewPNRRepository(db.GetPool())
     // Initialize services
     redisService := service.NewRedisService(redisClient)
-    bookingService := service.NewBookingService(bookingRepo,redisService)
+    bookingService := service.NewBookingService(bookingRepo,redisService, pnrRepo)
     emailOTPService := service.NewEmailOTPService()
      tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
     flightService := service.NewFlightService(flightRepo)
     paymentService := service.NewPaymentService(momoConfig, bookingRepo, paymentRepo)
+    bookingEmailService := service.NewBookingEmailService(bookingRepo, flightRepo, pnrRepo, userRepo, paymentRepo, emailOTPService)
 
     // Initialize controller
     bookingController := controller.NewBookingController(bookingService)
     userController := controller.NewUserController(userService)
     flightController := controller.NewFlightController(flightService)
     paymentController := controller.NewPaymentController(paymentService)
+    bookingEmailController := controller.NewEmailController(bookingEmailService)
 
 
     // Setup router
@@ -108,7 +111,7 @@ func NewHTTPServer(port int) (*Server, error) {
     router.FlightRoutes(apiV1, flightController, middleware.AuthMiddleware(tokenService))
     router.BookingRoutes(apiV1, bookingController, middleware.AuthMiddleware(tokenService))
     router.PaymentRoutes(apiV1, paymentController, middleware.AuthMiddleware(tokenService))
-
+    router.BookingEmailRoute(apiV1, bookingEmailController,)
 
     
     return &Server{

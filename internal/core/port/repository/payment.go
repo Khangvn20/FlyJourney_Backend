@@ -9,4 +9,5 @@ type PaymentRepository interface {
 	UpdatePaymentStatus(paymentID int64, status string) (*dto.Payment, error)
     GetBookingIDByTransactionID(transactionID string) (int64, error)
 	GetPaymentIDByTransactionID(transactionID string) (int64, error)
+	GetPaymentByBookingID(bookingID int64) (*dto.Payment, error)
 }

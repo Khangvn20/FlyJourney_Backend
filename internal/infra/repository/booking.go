@@ -183,14 +183,146 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
 func (r *bookingRepository) GetBookingByID(bookingID int64) (*dto.Booking, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
-    query :=`SELECT * FROM bookings WHERE booking_id = $1`
+    query := `
+        SELECT 
+            booking_id, user_id, flight_id, return_flight_id, booking_date, 
+            contact_email, contact_phone, contact_address, note, status, 
+            total_price,  check_in_status
+        FROM bookings
+        WHERE booking_id = $1
+    `
+
     var booking dto.Booking
-    err := r.db.QueryRow(ctx, query, bookingID).Scan(&booking.BookingID, &booking.UserID, &booking.FlightID, &booking.BookingDate,
-        &booking.ContactEmail, &booking.ContactPhone, &booking.ContactAddress, &booking.Note, &booking.Status,
-        &booking.TotalPrice, &booking.CheckInStatus)
+    err := r.db.QueryRow(ctx, query, bookingID).Scan(
+        &booking.BookingID,
+        &booking.UserID,
+        &booking.FlightID,
+        &booking.ReturnFlightID,
+        &booking.BookingDate,
+        &booking.ContactEmail,
+        &booking.ContactPhone,
+        &booking.ContactAddress,
+        &booking.Note,
+        &booking.Status,
+        &booking.TotalPrice,
+        &booking.CheckInStatus,
+    )
     if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return nil, fmt.Errorf("booking with ID %d not found", bookingID)
+        }
         return nil, fmt.Errorf("error getting booking by ID: %w", err)
     }
+      detailsQuery := `
+        SELECT 
+            bd.booking_detail_id, bd.booking_id, bd.passenger_age, bd.passenger_gender,
+            bd.flight_class_id, bd.return_flight_class_id, bd.price, bd.last_name, 
+            bd.first_name, bd.date_of_birth, bd.id_type, bd.id_number, bd.expiry_date, 
+            bd.issuing_country, bd.nationality,
+            fc.class as flight_class_name,
+            rfc.class as return_flight_class_name
+        FROM booking_details bd
+        LEFT JOIN flight_classes fc ON bd.flight_class_id = fc.flight_class_id
+        LEFT JOIN flight_classes rfc ON bd.return_flight_class_id = rfc.flight_class_id
+        WHERE bd.booking_id = $1
+        ORDER BY bd.booking_detail_id
+    `
+
+    rows, err := r.db.Query(ctx, detailsQuery, bookingID)
+    if err != nil {
+        log.Printf("Error fetching booking details: %v", err)
+        return nil, fmt.Errorf("error fetching booking details: %w", err)
+    }
+    defer rows.Close()
+
+    var details []*dto.BookingDetail
+    for rows.Next() {
+        var detail dto.BookingDetail
+        var flightClassName, returnFlightClassName *string
+
+        err := rows.Scan(
+            &detail.BookingDetailID,
+            &detail.BookingID,
+            &detail.PassengerAge,
+            &detail.PassengerGender,
+            &detail.FlightClassID,
+            &detail.ReturnFlightClassID,
+            &detail.Price,
+            &detail.LastName,
+            &detail.FirstName,
+            &detail.DateOfBirth,
+            &detail.IDType,
+            &detail.IDNumber,
+            &detail.ExpiryDate,
+            &detail.IssuingCountry,
+            &detail.Nationality,
+            &flightClassName,
+            &returnFlightClassName,
+        )
+        if err != nil {
+            log.Printf("Error scanning booking detail: %v", err)
+            continue
+        }
+
+        // Gán flight class name nếu có
+        if flightClassName != nil {
+            detail.FlightClassName = *flightClassName
+        } else {
+            detail.FlightClassName = "Unknown"
+        }
+        
+        if returnFlightClassName != nil {
+            detail.ReturnFlightClassName = returnFlightClassName
+        }
+        
+        details = append(details, &detail)
+        log.Printf("Loaded booking detail: ID=%d, Name=%s %s, Age=%d, FlightClass=%s (ID=%d)", 
+            detail.BookingDetailID, detail.FirstName, detail.LastName, detail.PassengerAge, 
+            detail.FlightClassName, detail.FlightClassID)
+    }
+
+    booking.Details = details
+    log.Printf("Total booking details loaded for booking %d: %d", bookingID, len(booking.Details))
+
+    if len(details) > 0 {
+        ancillariesQuery := `
+            SELECT 
+                ancillary_id, booking_detail_id, type, description, 
+                quantity, price, created_at
+            FROM booking_ancillaries ba
+            WHERE ba.booking_detail_id IN (
+                SELECT booking_detail_id FROM booking_details WHERE booking_id = $1
+            )
+        `
+
+        ancillaryRows, err := r.db.Query(ctx, ancillariesQuery, bookingID)
+        if err != nil {
+            log.Printf("Error fetching ancillaries: %v", err)
+        } else {
+            defer ancillaryRows.Close()
+            
+            var ancillaries []*dto.Ancillary
+            for ancillaryRows.Next() {
+                var ancillary dto.Ancillary
+                err := ancillaryRows.Scan(
+                    &ancillary.AncillaryID,
+                    &ancillary.BookingDetailID,
+                    &ancillary.Type,
+                    &ancillary.Description,
+                    &ancillary.Quantity,
+                    &ancillary.Price,
+                    &ancillary.CreatedAt,
+                )
+                if err != nil {
+                    log.Printf("Error scanning ancillary: %v", err)
+                    continue
+                }
+                ancillaries = append(ancillaries, &ancillary)
+            }
+            booking.Ancillaries = ancillaries
+        }
+    }
+
     return &booking, nil
 }
 

@@ -87,3 +87,17 @@ func (s *emailOTPService) VerifyEmail(email, otp string) *response.Response {
         ErrorMessage: "Email đã được xác thực",
     }
 }
+func (s *emailOTPService) SendHTMLMail(to, subject, htmlContent string) error {
+    from := os.Getenv("email_user")
+    password := os.Getenv("password_user")
+    smtpHost := "smtp.gmail.com"
+    smtpPort := "587"
+
+    auth := smtp.PlainAuth("", from, password, smtpHost)
+    
+    mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+    msg := []byte("Subject: " + subject + "\n" + mime + htmlContent)
+    
+    err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, msg)
+    return err
+}
