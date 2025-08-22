@@ -23,12 +23,14 @@ type paymentService struct {
 	momoConfig      *config.MomoConfig
 	bookingRepository  repository.BookingRepository
     paymentRepository   repository.PaymentRepository
+    bookingEmailService service.BookingEmailService
 }
-func NewPaymentService(momoConfig *config.MomoConfig, bookingRepo repository.BookingRepository, paymentRepo repository.PaymentRepository) service.PaymentService {
+func NewPaymentService(momoConfig *config.MomoConfig, bookingRepo repository.BookingRepository, paymentRepo repository.PaymentRepository, bookingEmailService service.BookingEmailService) service.PaymentService {
     return &paymentService{
         momoConfig:        momoConfig,
         bookingRepository: bookingRepo,
         paymentRepository: paymentRepo,
+        bookingEmailService: bookingEmailService,
     }
 }
 func (s *paymentService) GenerateMomoSignature(req *request.MomoRequest) response.Response {
@@ -203,8 +205,12 @@ func (s *paymentService) handleSuccessfulPayment(req *request.MomoCallbackReques
         ErrorCode:    error_code.InternalError,
         ErrorMessage: fmt.Sprintf("Failed to update booking status: %v", err),
     }
-}
-
+}    
+        emailResponse := s.bookingEmailService.SendBookingConfirmationEmail(bookingID)
+        if !emailResponse.Status {
+            log.Printf("Failed to send booking confirmation email: %v", emailResponse.ErrorMessage)
+        }
+    
     return response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
