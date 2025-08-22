@@ -88,14 +88,14 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
 	 bookingQuery := `
         INSERT INTO bookings (
             user_id, flight_id, return_flight_id, booking_date, contact_email, 
-            contact_phone, contact_address, note, status, 
+            contact_phone, contact_address, contact_name, note, status, 
             total_price, created_at, updated_at, check_in_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING booking_id`
 
     err = tx.QueryRow(ctx, bookingQuery,
         booking.UserID, booking.FlightID, booking.ReturnFlightID, booking.BookingDate,
-        booking.ContactEmail, booking.ContactPhone, booking.ContactAddress,
+        booking.ContactEmail, booking.ContactPhone, booking.ContactAddress, booking.ContactName,
         booking.Note, booking.Status, booking.TotalPrice,
         booking.CreatedAt, booking.UpdatedAt, booking.CheckInStatus).Scan(&booking.BookingID)
     

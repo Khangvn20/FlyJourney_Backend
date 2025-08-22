@@ -156,6 +156,7 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
         ContactEmail:   req.ContactEmail,
         ContactPhone:   req.ContactPhone,
         ContactAddress: req.ContactAddress,
+        ContactName:    req.ContactName,
         Note:           req.Note,
         TotalPrice:     req.TotalPrice,
         Status:         "pending_payment",
@@ -296,5 +297,23 @@ func (s *bookingService) CancelExpiredBookings() *response.Response {
         ErrorCode:    error_code.Success,
         ErrorMessage: fmt.Sprintf("Hủy thành công %d đặt chỗ quá hạn", len(canceledBookingIDs)),
         Data:         canceledBookingIDs,
+    }
+}
+func (s *bookingService) GetBookingID(bookingID int64) *response.Response {
+    booking, err := s.bookingRepo.GetBookingByID(bookingID)
+    if err != nil {
+        log.Printf("Error fetching booking by ID %d: %v", bookingID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("failed to fetch data: %v", err),
+        }
+    }
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successful",
+        Data:         booking,
     }
 }

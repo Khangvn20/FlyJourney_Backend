@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+    "strconv"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
@@ -56,4 +57,31 @@ func (c *BookingController) CreateBooking(ctx *gin.Context) {
     }
 
     ctx.JSON(statusCode, result)
+}
+
+func (c *BookingController) GetBookingByID(ctx *gin.Context) {
+    bookingIDParam := ctx.Param("bookingID")
+    bookingID, err := strconv.ParseInt(bookingIDParam, 10, 64)
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":  false,
+            "message": "Invalid booking ID",
+        })
+        return
+    }
+
+    response := c.bookingService.GetBookingID(bookingID)
+    if !response.Status {
+        ctx.JSON(http.StatusNotFound, gin.H{
+            "status":  false,
+            "message": response.ErrorMessage,
+        })
+        return
+    }
+
+    ctx.JSON(http.StatusOK, gin.H{
+        "status":  true,
+        "message": response.ErrorMessage,
+        "data":    response.Data,
+    })
 }

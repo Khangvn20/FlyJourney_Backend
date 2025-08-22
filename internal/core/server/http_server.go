@@ -91,8 +91,8 @@ func NewHTTPServer(port int) (*Server, error) {
      tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
     flightService := service.NewFlightService(flightRepo)
-    paymentService := service.NewPaymentService(momoConfig, bookingRepo, paymentRepo)
     bookingEmailService := service.NewBookingEmailService(bookingRepo, flightRepo, pnrRepo, userRepo, paymentRepo, emailOTPService)
+    paymentService := service.NewPaymentService(momoConfig, bookingRepo, paymentRepo, bookingEmailService)
 
     // Initialize controller
     bookingController := controller.NewBookingController(bookingService)

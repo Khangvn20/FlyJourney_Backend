@@ -6,6 +6,7 @@ type CreateBookingRequest struct {
 	ContactEmail  string `json:"contact_email" binding:"required,email"`
     ContactAddress string `json:"contact_address" binding:"required"`
 	ContactPhone   string `json:"contact_phone" binding:"required"`
+	ContactName    string `json:"contact_name" binding:"required"`
 	Note           string `json:"note"`
 	TotalPrice     float64  `json:"total_price" binding:"required,numeric"`
 	Details		  []*BookingDetailRequest `json:"details" binding:"required,dive"`
