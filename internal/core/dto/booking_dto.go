@@ -28,10 +28,12 @@ type Booking struct {
 type BookingDetail struct {
 	BookingDetailID int64      `json:"booking_detail_id"`
 	BookingID       int64      `json:"booking_id"`
+	FlightClassName string     `json:"flight_class_name"` // e.g., "Economy", "Business"
 	PassengerAge    int        `json:"passenger_age"`
 	PassengerGender string     `json:"passenger_gender"`
 	FlightClassID   int64      `json:"flight_class_id"`
 	ReturnFlightClassID *int64  `json:"return_flight_class_id"`
+	ReturnFlightClassName *string `json:"return_flight_class_name"` // Optional: nil if not applicable
 	SeatID          *int64     `json:"seat_id"`             // Optional: nil if not assigned yet
 	Price           float64    `json:"price"`
 	LastName        string     `json:"last_name"`
@@ -52,4 +54,34 @@ type Ancillary struct {
 	Quantity      int       `json:"quantity"`       // e.g., 1 for one meal, 2 for extra bags
 	Price         float64   `json:"price"`          // Price for this add-on (can be dynamic)
 	CreatedAt     time.Time `json:"created_at"`     // When this add-on was selected
+}
+type BookingEmailData struct {
+	BookingID      int64     `json:"booking_id"`
+	PNRCode       string    `json:"pnr_code"`
+	UserFullName string    `json:"user_full_name"`
+	ContactEmail  string    `json:"contact_email"`
+	ContactPhone  string    `json:"contact_phone"`
+	ContactAddress string   `json:"contact_address"`
+	TotalPrice     string  `json:"total_price"`
+	PaymentDate    time.Time `json:"payment_date"`
+	PaymentMethod  string    `json:"payment_method"`
+	OutboundFlight  *BookingEmailFlight `json:"outbound_flight"`
+	InboundFlight   *BookingEmailFlight `json:"inbound_flight"`
+	Passengers      []*BookingEmailPassenger   `json:"passengers"`
+}
+type BookingEmailFlight struct {
+    FlightNumber     string    `json:"flight_number"`
+    AirlineName      string    `json:"airline_name"`
+    DepartureAirport string    `json:"departure_airport"`
+    ArrivalAirport   string    `json:"arrival_airport"`
+    DepartureTime    time.Time `json:"departure_time"`
+    ArrivalTime      time.Time `json:"arrival_time"`
+    FlightClass      string    `json:"flight_class"`
+}
+
+type BookingEmailPassenger struct {
+    FullName    string `json:"full_name"`
+    Type        string `json:"type"` // adult, child, infant
+    SeatNumber  string `json:"seat_number,omitempty"`
+	FlightClass  string `json:"flight_class,omitempty"`
 }

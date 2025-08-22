@@ -26,7 +26,7 @@ func (r *pnrRepository) GeneratePNR(bookingID int64) (string, error) {
         pnrCode := r.generateRandomPNRCode()
 
         var exists bool
-        err := r.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pnr WHERE pnr_code = $1)", pnrCode).Scan(&exists)
+        err := r.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pnr_records WHERE pnr_code = $1)", pnrCode).Scan(&exists)
         if err != nil {
             return "", fmt.Errorf("failed to check PNR existence: %v", err)
         }
@@ -41,14 +41,28 @@ func (r *pnrRepository) GeneratePNR(bookingID int64) (string, error) {
 func (r *pnrRepository) generateRandomPNRCode() string {
 
     const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    prefix := make([]byte, 2)
-    for i := range prefix {
-        prefix[i] = letters[rand.Intn(len(letters))]
+    const numbers = "0123456789"
+    const specialChars = "!@#$%^&*"
+    code := make([]byte, 12)
+  for i := 0; i < 4; i++ {
+        code[i] = letters[rand.Intn(len(letters))]
     }
 
-    digits := rand.Intn(10000)
-    
-    return fmt.Sprintf("%s%04d", string(prefix), digits)
+
+    for i := 4; i < 8; i++ {
+        code[i] = numbers[rand.Intn(len(numbers))]
+    }
+
+    for i := 8; i < 10; i++ {
+        code[i] = specialChars[rand.Intn(len(specialChars))]
+    }
+
+
+    for i := 10; i < 12; i++ {
+        code[i] = letters[rand.Intn(len(letters))]
+    }
+
+    return string(code)
 }
 func (r *pnrRepository) CreatePnr(pnr *dto.PNR) (*dto.PNR, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -60,6 +74,10 @@ func (r *pnrRepository) CreatePnr(pnr *dto.PNR) (*dto.PNR, error) {
         if err != nil {
             return nil, fmt.Errorf("invalid booking ID format: %v", err)
         }
+    now := time.Now()
+    pnr.IssuedAt = &now
+    expiresAt := now.Add(24 * time.Hour) 
+    pnr.ExpiresAt = &expiresAt
 
         // Sử dụng hàm GeneratePNR có sẵn
         generatedCode, err := r.GeneratePNR(bookingID)
@@ -69,21 +87,14 @@ func (r *pnrRepository) CreatePnr(pnr *dto.PNR) (*dto.PNR, error) {
         pnr.PNRCode = generatedCode
     }
 
-    currentTime := time.Now().Format("2006-01-02 15:04:05")
-    if pnr.IssuedAt == "" {
-        pnr.IssuedAt = currentTime
-    }
+   
     if pnr.Status == "" {
         pnr.Status = "active"
     }
-    if pnr.ExpiresAt == "" {
-  
-        expiryTime := time.Now().AddDate(1, 0, 0).Format("2006-01-02 15:04:05")
-        pnr.ExpiresAt = expiryTime
-    }
+
 
     query := `
-        INSERT INTO pnrs (
+        INSERT INTO pnr_records (
             pnr_code, booking_id, flight_id, return_flight_id,
             status, issued_at, expires_at, created_by, pnr_data
         )
@@ -126,7 +137,7 @@ func (r *pnrRepository) CheckPnrExists(code string) (bool, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    query := `SELECT EXISTS(SELECT 1 FROM pnrs WHERE pnr_code = $1)`
+    query := `SELECT EXISTS(SELECT 1 FROM pnr_records WHERE pnr_code = $1)`
 
     var exists bool
     err := r.db.QueryRow(ctx, query, code).Scan(&exists)
@@ -145,7 +156,7 @@ func (r *pnrRepository) GetPnrByBookingID(bookingID int64) (*dto.PNR, error) {
     query := `
         SELECT pnr_code, booking_id, flight_id, return_flight_id,
                status, issued_at, expires_at, created_by, modified_by, pnr_data
-        FROM pnrs
+        FROM pnr_records
         WHERE booking_id = $1
     `
 
@@ -177,7 +188,7 @@ func (r *pnrRepository) GetBookingIDByPnrCode(pnrCode string) (int64, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    query := `SELECT booking_id FROM pnrs WHERE pnr_code = $1`
+    query := `SELECT booking_id FROM pnr_records WHERE pnr_code = $1`
 
     var bookingIDStr string
     err := r.db.QueryRow(ctx, query, pnrCode).Scan(&bookingIDStr)
@@ -202,7 +213,7 @@ func (r *pnrRepository) UpdatePnr(pnr *dto.PNR) (*dto.PNR, error) {
     defer cancel()
 
     query := `
-        UPDATE pnrs
+        UPDATE pnr_records
         SET status = $1, 
             expires_at = $2, 
             modified_by = $3,

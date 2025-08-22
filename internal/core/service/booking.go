@@ -4,7 +4,7 @@ import (
     "fmt"
     "log"
     "time"
-
+    "database/sql"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
@@ -15,11 +15,13 @@ import (
 type bookingService struct {
     bookingRepo  repository.BookingRepository
     redisService service.RedisService  
+    pnrRepo      repository.PnrRepository 
 }
-func NewBookingService(bookingRepo repository.BookingRepository, redisService service.RedisService) service.BookingService{
+func NewBookingService(bookingRepo repository.BookingRepository, redisService service.RedisService, pnrRepo repository.PnrRepository) service.BookingService {
     return &bookingService{
         bookingRepo:  bookingRepo,
         redisService: redisService,
+        pnrRepo:      pnrRepo,
     }
 }
 
@@ -213,8 +215,7 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
             }
         }
     }
-    
-    // 9. Tạo booking trong database
+  
     createdBooking, err := s.bookingRepo.CreateBooking(booking)
     if err != nil {
         log.Printf("Error creating booking: %v", err)
@@ -224,7 +225,28 @@ func (s *bookingService) CreateBooking(req *request.CreateBookingRequest) *respo
             ErrorMessage: fmt.Sprintf("Lỗi tạo đặt chỗ: %v", err),
         }
     }
-    
+    pnr := &dto.PNR{
+        BookingID:      fmt.Sprintf("%d", createdBooking.BookingID),
+        FlightID:       fmt.Sprintf("%d", createdBooking.FlightID),
+        ReturnFlightID: sql.NullString{},
+        Status:         "active",
+    }
+
+    // Nếu có chuyến về, thêm vào PNR
+    if createdBooking.ReturnFlightID != nil {
+        pnr.ReturnFlightID = sql.NullString{
+            String: fmt.Sprintf("%d", *createdBooking.ReturnFlightID),
+            Valid:  true,
+        }
+    }
+
+    // Tạo PNR record
+    createdPNR, err := s.pnrRepo.CreatePnr(pnr)
+    if err != nil {
+        log.Printf("Error creating PNR for booking %d: %v", createdBooking.BookingID, err)
+    } else {
+        log.Printf("PNR %s created successfully for booking %d", createdPNR.PNRCode, createdBooking.BookingID)
+    }
     // 10. Đặt timeout cho booking (2 giờ)
     timeoutKey := fmt.Sprintf("booking:timeout:%d", createdBooking.BookingID)
     if err := s.redisService.Set(timeoutKey, "pending_payment", 2*time.Hour); err != nil {
