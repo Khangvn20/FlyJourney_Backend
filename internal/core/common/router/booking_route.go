@@ -9,5 +9,6 @@ func BookingRoutes(r *gin.RouterGroup, bookingController *controller.BookingCont
 	bookingRoutes := r.Group("/booking")
 	{
 		bookingRoutes.POST("", authMiddleware, bookingController.CreateBooking)
+		bookingRoutes.GET("/:bookingID", authMiddleware, bookingController.GetBookingByID)
 	}
 }

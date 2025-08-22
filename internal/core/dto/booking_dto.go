@@ -13,6 +13,7 @@ type Booking struct {
 	ContactEmail   string           `json:"contact_email"`    // Email liên hệ
 	ContactPhone   string           `json:"contact_phone"`    // Số điện thoại liên hệ
 	ContactAddress string           `json:"contact_address"`
+	ContactName    string           `json:"contact_name"`     // Tên liên hệ
 	Note           string           `json:"note"`             // Ghi chú
 	Status         string           `json:"status"`           // e.g., "pending", "booked", "confirmed", "cancelled"
 	TotalPrice     float64          `json:"total_price"`
