@@ -317,3 +317,21 @@ func (s *bookingService) GetBookingID(bookingID int64) *response.Response {
         Data:         booking,
     }
 }
+func (s *bookingService) GetAllBookingByUserID(userID int64) *response.Response {
+    bookings, err := s.bookingRepo.GetAllBookingByUserID(userID)
+    if err != nil {
+        log.Printf("Error fetching bookings for user ID %d: %v", userID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: fmt.Sprintf("failed to fetch data: %v", err),
+        }
+    }
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Successful",
+        Data:         bookings,
+    }
+}

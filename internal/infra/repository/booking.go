@@ -402,3 +402,278 @@ func(r *bookingRepository) UpdateStatusConfirm(bookingID int64) (*dto.Booking, e
     
     return &booking, nil
 }
+func (r *bookingRepository) UpdateBookingStatus(bookingID int64, status string) (*dto.Booking, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        UPDATE bookings
+        SET status = $1, updated_at = NOW()
+        WHERE booking_id = $2
+        RETURNING booking_id, user_id, status, updated_at
+    `
+
+    var booking dto.Booking
+    err := r.db.QueryRow(ctx, query, status, bookingID).Scan(&booking.BookingID, &booking.UserID, &booking.Status, &booking.UpdatedAt)
+    if err != nil {
+        return nil, fmt.Errorf("error updating booking status: %w", err)
+    }
+
+    return &booking, nil
+}
+func (r *bookingRepository) GetBookingsByFlightID(flightID int64) ([]*dto.Booking, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT 
+            booking_id, user_id, flight_id, return_flight_id, booking_date, 
+            contact_email, contact_phone, contact_address, note, status, 
+            total_price, check_in_status, created_at, updated_at
+        FROM bookings
+        WHERE flight_id = $1
+        ORDER BY booking_date DESC
+    `
+
+    rows, err := r.db.Query(ctx, query, flightID)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching bookings by flight ID: %w", err)
+    }
+    defer rows.Close()
+
+    var bookings []*dto.Booking
+    for rows.Next() {
+        var booking dto.Booking
+        err := rows.Scan(
+            &booking.BookingID,
+            &booking.UserID,
+            &booking.FlightID,
+            &booking.ReturnFlightID,
+            &booking.BookingDate,
+            &booking.ContactEmail,
+            &booking.ContactPhone,
+            &booking.ContactAddress,
+            &booking.Note,
+            &booking.Status,
+            &booking.TotalPrice,
+            &booking.CheckInStatus,
+            &booking.CreatedAt,
+            &booking.UpdatedAt,
+        )
+        if err != nil {
+            log.Printf("Error scanning booking: %v", err)
+            continue
+        }
+
+        bookings = append(bookings, &booking)
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("error iterating over bookings: %w", err)
+    }
+
+    return bookings, nil
+}
+func (r *bookingRepository) GetAllBookingByUserID(userID int64) ([]*dto.Booking, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    // Query để lấy thông tin cơ bản của booking
+    query := `
+        SELECT 
+            booking_id, user_id, flight_id, return_flight_id, booking_date, 
+            contact_email, contact_phone, contact_address, note, status, 
+            total_price, check_in_status, created_at, updated_at
+        FROM bookings
+        WHERE user_id = $1
+        ORDER BY booking_date DESC
+    `
+
+    rows, err := r.db.Query(ctx, query, userID)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching bookings by user ID: %w", err)
+    }
+    defer rows.Close()
+
+    var bookings []*dto.Booking
+    bookingMap := make(map[int64]*dto.Booking)
+
+    for rows.Next() {
+        var booking dto.Booking
+        err := rows.Scan(
+            &booking.BookingID,
+            &booking.UserID,
+            &booking.FlightID,
+            &booking.ReturnFlightID,
+            &booking.BookingDate,
+            &booking.ContactEmail,
+            &booking.ContactPhone,
+            &booking.ContactAddress,
+            &booking.Note,
+            &booking.Status,
+            &booking.TotalPrice,
+            &booking.CheckInStatus,
+            &booking.CreatedAt,
+            &booking.UpdatedAt,
+        )
+        if err != nil {
+            log.Printf("Error scanning booking: %v", err)
+            continue
+        }
+
+        bookings = append(bookings, &booking)
+        bookingMap[booking.BookingID] = &booking
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("error iterating over bookings: %w", err)
+    }
+
+
+    detailsQuery := `
+        SELECT 
+            bd.booking_detail_id, bd.booking_id, bd.passenger_age, bd.passenger_gender,
+            bd.flight_class_id, bd.return_flight_class_id, bd.price, bd.last_name, 
+            bd.first_name, bd.date_of_birth, bd.id_type, bd.id_number, bd.expiry_date, 
+            bd.issuing_country, bd.nationality,
+            fc.class as flight_class_name,
+            rfc.class as return_flight_class_name
+        FROM booking_details bd
+        LEFT JOIN flight_classes fc ON bd.flight_class_id = fc.flight_class_id
+        LEFT JOIN flight_classes rfc ON bd.return_flight_class_id = rfc.flight_class_id
+        WHERE bd.booking_id = ANY($1)
+        ORDER BY bd.booking_detail_id
+    `
+
+    bookingIDs := make([]int64, 0, len(bookingMap))
+    for id := range bookingMap {
+        bookingIDs = append(bookingIDs, id)
+    }
+
+    detailRows, err := r.db.Query(ctx, detailsQuery, bookingIDs)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching booking details: %w", err)
+    }
+    defer detailRows.Close()
+
+    for detailRows.Next() {
+        var detail dto.BookingDetail
+        var flightClassName, returnFlightClassName *string
+
+        err := detailRows.Scan(
+            &detail.BookingDetailID,
+            &detail.BookingID,
+            &detail.PassengerAge,
+            &detail.PassengerGender,
+            &detail.FlightClassID,
+            &detail.ReturnFlightClassID,
+            &detail.Price,
+            &detail.LastName,
+            &detail.FirstName,
+            &detail.DateOfBirth,
+            &detail.IDType,
+            &detail.IDNumber,
+            &detail.ExpiryDate,
+            &detail.IssuingCountry,
+            &detail.Nationality,
+            &flightClassName,
+            &returnFlightClassName,
+        )
+        if err != nil {
+            log.Printf("Error scanning booking detail: %v", err)
+            continue
+        }
+
+        if flightClassName != nil {
+            detail.FlightClassName = *flightClassName
+        }
+        if returnFlightClassName != nil {
+            detail.ReturnFlightClassName = returnFlightClassName
+        }
+        if booking, exists := bookingMap[detail.BookingID]; exists {
+            booking.Details = append(booking.Details, &detail)
+        }
+    }
+//query payment
+paymentsQuery := `
+        SELECT 
+            payment_id, booking_id, amount, status, payment_method ,paid_at, transaction_id
+        FROM payments
+        WHERE booking_id = ANY($1)
+    `
+
+    bookingIDs = make([]int64, 0, len(bookingMap))
+    for id := range bookingMap {
+    bookingIDs = append(bookingIDs, id)
+    }
+    paymentRows, err := r.db.Query(ctx, paymentsQuery, bookingIDs)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching payments: %w", err)
+    }
+    defer paymentRows.Close()
+
+    for paymentRows.Next() {
+        var payment dto.Payment
+        err := paymentRows.Scan(
+            &payment.PaymentID,
+            &payment.BookingID,
+            &payment.Amount,
+            &payment.Status,
+            &payment.PaymentMethod,
+            &payment.PaidAt,
+            &payment.TransactionID,
+        )
+        if err != nil {
+            log.Printf("Error scanning payment: %v", err)
+            continue
+        }
+
+        if booking, exists := bookingMap[payment.BookingID]; exists {
+            booking.Payment = &payment
+        }
+    }
+
+    ancillariesQuery := `
+        SELECT 
+            ancillary_id, booking_detail_id, type, description, 
+            quantity, price, created_at
+        FROM booking_ancillaries ba
+        WHERE ba.booking_detail_id = ANY(
+            SELECT booking_detail_id FROM booking_details WHERE booking_id = ANY($1)
+        )
+    `
+
+    ancillaryRows, err := r.db.Query(ctx, ancillariesQuery, bookingIDs)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching ancillaries: %w", err)
+    }
+    defer ancillaryRows.Close()
+
+    for ancillaryRows.Next() {
+        var ancillary dto.Ancillary
+        err := ancillaryRows.Scan(
+            &ancillary.AncillaryID,
+            &ancillary.BookingDetailID,
+            &ancillary.Type,
+            &ancillary.Description,
+            &ancillary.Quantity,
+            &ancillary.Price,
+            &ancillary.CreatedAt,
+        )
+        if err != nil {
+            log.Printf("Error scanning ancillary: %v", err)
+            continue
+        }
+
+        for _, booking := range bookings {
+            for _, detail := range booking.Details {
+                if detail.BookingDetailID == ancillary.BookingDetailID {
+                    booking.Ancillaries = append(booking.Ancillaries, &ancillary)
+                    break
+                }
+            }
+        }
+    }
+
+    return bookings, nil
+}

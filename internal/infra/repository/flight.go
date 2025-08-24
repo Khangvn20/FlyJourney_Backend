@@ -1078,3 +1078,22 @@ func (r *flightRepository) SearchRoundtripFlights(
         InboundFlights:  inboundFlights,
     }, nil
 }
+
+
+func (r *flightRepository) UpdateFlightTime(flightID int, departureTime time.Time, arrivalTime time.Time) error {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        UPDATE flights
+        SET departure_time = $1, arrival_time = $2, updated_at = $3
+        WHERE flight_id = $4
+    `
+
+    _, err := r.db.Exec(ctx, query, departureTime, arrivalTime, time.Now(), flightID)
+    if err != nil {
+        return fmt.Errorf("error updating flight times: %w", err)
+    }
+
+    return nil
+}

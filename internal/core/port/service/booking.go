@@ -10,4 +10,5 @@ type BookingService interface {
 	CancelExpiredBookings() *response.Response
 	RateLimitBooking(userID int64) *response.Response
 	GetBookingID(bookingID int64) *response.Response
+	GetAllBookingByUserID(userID int64) *response.Response
 }

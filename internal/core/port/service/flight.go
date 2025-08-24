@@ -22,4 +22,5 @@ type FlightService interface {
 	GetFlightByIDForUser(flightID int) *response.Response 
     GetFlightByIDForAdmin(flightID int) *response.Response
 	SearchRoundtripFlightsForUser(req *request.RoundtripFlightSearchRequest) *response.Response
+	CancelFlight(flightID int64, reason string) *response.Response
 }
