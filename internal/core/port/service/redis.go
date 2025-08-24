@@ -12,4 +12,6 @@ type RedisService interface {
     ReleaseLock(key string,value string) error
     Incr(key string) (int64, error)
     Expire(key string, expiration time.Duration) error
+    Keys(pattern string) ([]string, error)
+    SetJSON(key string, value interface{}, expiration time.Duration) error
 }

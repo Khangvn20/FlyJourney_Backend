@@ -3,6 +3,7 @@ package service
 import (
     "log"
     "time"
+    "fmt"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
@@ -13,11 +14,14 @@ import (
 )
 type flightService struct {
 	flightRepo repository.FlightRepository
-	
+    redisService service.RedisService
+    bookingRepo repository.BookingRepository
 }
-func NewFlightService(flightRepo repository.FlightRepository) service.FlightService {
+func NewFlightService(flightRepo repository.FlightRepository, redisService service.RedisService, bookingRepo repository.BookingRepository) service.FlightService {
 	return &flightService{
-		flightRepo: flightRepo,
+		flightRepo:  flightRepo,
+		redisService: redisService,
+		bookingRepo:  bookingRepo,
 	}
 }
 func (s *flightService) CreateFlightClasses(flightID int, req []request.FlightClassRequest) (*response.Response, error) {
@@ -1300,6 +1304,64 @@ func (s *flightService) SearchRoundtripFlightsForUser(req *request.RoundtripFlig
             "passenger_count":         req.Passengers,
             "sort_by":                 sortBy,
             "sort_order":              sortOrder,
+        },
+    }
+}
+// Thêm vào file hiện có
+
+func (s *flightService) CancelFlight(flightID int64, reason string) *response.Response {
+
+    err := s.flightRepo.UpdateStatus(int(flightID), "cancelled")
+    if err != nil {
+        log.Printf("Error updating flight status: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Không thể cập nhật trạng thái chuyến bay",
+        }
+    }
+    
+    bookings, err := s.bookingRepo.GetBookingsByFlightID(flightID)
+    if err != nil {
+        log.Printf("Error fetching bookings for flight %d: %v", flightID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Không thể lấy danh sách đặt vé",
+        }
+    }
+    
+  
+    for _, booking := range bookings {
+
+        _, err := s.bookingRepo.UpdateBookingStatus(booking.BookingID, "cancelled")
+        if err != nil {
+            log.Printf("Error updating booking status for booking %d: %v", booking.BookingID, err)
+            continue
+        }
+        
+    
+        notificationKey := fmt.Sprintf("notification:cancellation:%d", booking.BookingID)
+        notificationData := map[string]interface{}{
+            "booking_id": booking.BookingID,
+            "flight_id":  flightID,
+            "reason":     reason,
+            "timestamp":  time.Now().Unix(),
+        }
+        
+        err = s.redisService.SetJSON(notificationKey, notificationData, 24*time.Hour)
+        if err != nil {
+            log.Printf("Error queueing notification for booking %d: %v", booking.BookingID, err)
+        }
+    }
+    
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: fmt.Sprintf("Đã hủy chuyến bay và đưa %d thông báo vào hàng đợi", len(bookings)),
+        Data: map[string]interface{}{
+            "flight_id": flightID,
+            "bookings":  len(bookings),
         },
     }
 }

@@ -85,3 +85,18 @@ func (c *BookingController) GetBookingByID(ctx *gin.Context) {
         "data":    response.Data,
     })
 }
+func (c *BookingController) GetAllBookingByUserID(ctx *gin.Context) {
+    userID, exists := ctx.Get("userID")
+    if !exists {
+        ctx.JSON(http.StatusUnauthorized, gin.H{
+            "status":       false,
+            "errorCode":    error_code.InternalErrMsg,
+            "errorMessage": "Không tìm thấy thông tin người dùng",
+        })
+        return
+    }
+
+    response := c.bookingService.GetAllBookingByUserID(int64(userID.(int)))
+
+    ctx.JSON(http.StatusOK, response)
+}
