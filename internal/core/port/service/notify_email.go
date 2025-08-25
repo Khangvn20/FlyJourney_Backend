@@ -9,4 +9,6 @@ type BookingEmailService interface {
     SendBookingConfirmationEmail(bookingID int64) *response.Response
     SendFlightCancelEmail(bookingID int64, reason string) *response.Response
     SendFlightDelayEmail(bookingID int64, newDepartureTime time.Time, reason string) *response.Response
+    SendFlightDelayEmailToAllConfirmedBookings(flightID int64, newDepartureTime time.Time, reason string) *response.Response
+    QueueFlightDelayNotifications(flightID int64, newDepartureTime time.Time, reason string) *response.Response
 }

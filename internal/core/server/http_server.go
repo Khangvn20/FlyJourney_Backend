@@ -16,6 +16,7 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/Khangvn20/FlyJourney_Backend/internal/infra/config"
     "github.com/joho/godotenv"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/worker"
 )
 
 type Server struct {
@@ -91,16 +92,22 @@ func NewHTTPServer(port int) (*Server, error) {
      tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
     flightService := service.NewFlightService(flightRepo,redisService, bookingRepo)
-    bookingEmailService := service.NewBookingEmailService(bookingRepo, flightRepo, pnrRepo, userRepo, paymentRepo, emailOTPService)
+    bookingEmailService := service.NewBookingEmailService(bookingRepo, flightRepo, pnrRepo, userRepo, paymentRepo, emailOTPService, redisService)
     paymentService := service.NewPaymentService(momoConfig, bookingRepo, paymentRepo, bookingEmailService)
 
     // Initialize controller
     bookingController := controller.NewBookingController(bookingService)
     userController := controller.NewUserController(userService)
-    flightController := controller.NewFlightController(flightService)
+    flightController := controller.NewFlightController(flightService,bookingEmailService)
     paymentController := controller.NewPaymentController(paymentService)
     bookingEmailController := controller.NewEmailController(bookingEmailService)
-
+    //Initialize Notification Worker
+    emailNotificationWorker := worker.NewEmailNotificationWorker(redisService, bookingEmailService, 5*time.Minute)
+    emailNotificationWorker.Start()
+    go func() {
+        log.Println("Email notification worker started")
+        emailNotificationWorker.Start()
+    }()
 
     // Setup router
     r.Use(gin.Recovery())

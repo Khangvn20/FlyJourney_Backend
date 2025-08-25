@@ -3,18 +3,22 @@ package controller
 import (
 	"net/http"
 	"strconv"
+    "log"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
 	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
 	"github.com/gin-gonic/gin"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/common/utils"
 )
 type FlightController struct {
 	flightService service.FlightService
+    bookingEmailService service.BookingEmailService
 }
-func NewFlightController(flightService service.FlightService) *FlightController {
+func NewFlightController(flightService service.FlightService, bookingEmailService service.BookingEmailService) *FlightController {
     return &FlightController{
         flightService: flightService,
+        bookingEmailService: bookingEmailService,
     }
 }
 func (c *FlightController) CreateFlight(ctx *gin.Context) {
@@ -373,5 +377,84 @@ func (c *FlightController) SearchRoundtripFlightsForUser(ctx *gin.Context) {
     }
     
     result := c.flightService.SearchRoundtripFlightsForUser(&req)
+    ctx.JSON(http.StatusOK, result)
+}
+
+
+func (c *FlightController) UpdateFlightTime(ctx *gin.Context) {
+    idStr := ctx.Param("id")
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_ID",
+            "errorMessage": "Invalid flight ID format",
+        })
+        return
+    }
+
+    var req request.UpdateFlightTimeRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    "INVALID_REQUEST",
+            "errorMessage": err.Error(),
+        })
+        return
+    }
+
+    result := c.flightService.UpdateFlightTime(int64(id), &req)
+    ctx.JSON(http.StatusOK, result)
+}
+
+func (c *FlightController) QueueDelayNotifications (ctx *gin.Context){
+    var req struct {
+        FlightID        int64  `json:"flight_id"`
+        NewDepartureTime string `json:"new_departure_time"`
+        Reason           string `json:"reason"`
+    }
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        ctx.JSON(http.StatusBadRequest, response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid request format: " + err.Error(),
+        })
+        return
+    }
+
+ 
+    newDepartureTime, err := utils.ParseTime(req.NewDepartureTime)
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid time format. Expected format: dd/MM/yyyy HH:mm",
+        })
+        return
+    }
+    if req.FlightID <= 0 {
+        ctx.JSON(http.StatusBadRequest, response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid flight ID",
+        })
+        return
+    }
+
+    if len(req.Reason) < 5 {
+        ctx.JSON(http.StatusBadRequest, response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Reason must be at least 5 characters",
+        })
+        return
+    }
+
+    log.Printf("Queuing delay notifications for flight %d with new departure time %s and reason: %s",
+        req.FlightID, req.NewDepartureTime, req.Reason)
+
+
+    result := c.bookingEmailService.QueueFlightDelayNotifications(req.FlightID, newDepartureTime, req.Reason)
+
     ctx.JSON(http.StatusOK, result)
 }

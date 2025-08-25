@@ -37,6 +37,12 @@ type FlightClass struct {
     FareClassDetails  *FareClasses  `json:"fare_class_details,omitempty"`
     UpdatedAt      time.Time `json:"updated_at,omitempty"`
 }
+type FlightDelayNotification struct {
+    FlightID        int64  `json:"flight_id"`
+    NewDepartureTime int64  `json:"new_departure_time"`
+    Reason           string `json:"reason"`
+}
+
 type FlightSearchResult struct {
     // Flight basic info
     FlightID             int    `json:"flight_id"`
