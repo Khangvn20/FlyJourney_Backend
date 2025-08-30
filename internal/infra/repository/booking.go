@@ -185,14 +185,18 @@ func (r *bookingRepository) GetBookingByID(bookingID int64) (*dto.Booking, error
     defer cancel()
     query := `
         SELECT 
-            booking_id, user_id, flight_id, return_flight_id, booking_date, 
-            contact_email, contact_name, contact_phone, contact_address, note, status, 
-            total_price,  check_in_status
-        FROM bookings
-        WHERE booking_id = $1
+            b.booking_id, b.user_id, b.flight_id, b.return_flight_id, b.booking_date, 
+            b.contact_email, b.contact_name, b.contact_phone, b.contact_address, b.note, b.status, 
+            b.total_price, b.check_in_status, b.created_at, b.updated_at,
+            f.departure_time, f.arrival_time, f.duration_minutes,
+            f.departure_airport_code, f.arrival_airport_code
+        FROM bookings b
+        LEFT JOIN flights f ON b.flight_id = f.flight_id
+        WHERE b.booking_id = $1
     `
 
     var booking dto.Booking
+
     err := r.db.QueryRow(ctx, query, bookingID).Scan(
         &booking.BookingID,
         &booking.UserID,
@@ -207,6 +211,13 @@ func (r *bookingRepository) GetBookingByID(bookingID int64) (*dto.Booking, error
         &booking.Status,
         &booking.TotalPrice,
         &booking.CheckInStatus,
+        &booking.CreatedAt,
+        &booking.UpdatedAt,
+        &booking.DepartureTime,
+        &booking.ArrivalTime,
+        &booking.Duration,
+        &booking.DepartureAirportCode,
+        &booking.ArrivalAirportCode,
     )
     if err != nil {
         if errors.Is(err, pgx.ErrNoRows) {
@@ -482,13 +493,17 @@ func (r *bookingRepository) GetAllBookingByUserID(userID int64) ([]*dto.Booking,
     // Query để lấy thông tin cơ bản của booking
     query := `
         SELECT 
-            booking_id, user_id, flight_id, return_flight_id, booking_date, 
-            contact_email, contact_phone, contact_address, note, status, 
-            total_price, check_in_status, created_at, updated_at
-        FROM bookings
-        WHERE user_id = $1
-        ORDER BY booking_date DESC
+            b.booking_id, b.user_id, b.flight_id, b.return_flight_id, b.booking_date, 
+            b.contact_email, b.contact_phone, b.contact_address, b.contact_name, b.note, b.status, 
+            b.total_price, b.check_in_status, b.created_at, b.updated_at,
+            f.departure_time, f.arrival_time,f.duration_minutes,
+            f.departure_airport_code, f.arrival_airport_code
+        FROM bookings b
+        LEFT JOIN flights f ON b.flight_id = f.flight_id
+        WHERE b.user_id = $1
+        ORDER BY b.booking_date DESC
     `
+
 
     rows, err := r.db.Query(ctx, query, userID)
     if err != nil {
@@ -510,12 +525,18 @@ func (r *bookingRepository) GetAllBookingByUserID(userID int64) ([]*dto.Booking,
             &booking.ContactEmail,
             &booking.ContactPhone,
             &booking.ContactAddress,
+            &booking.ContactName,
             &booking.Note,
             &booking.Status,
             &booking.TotalPrice,
             &booking.CheckInStatus,
             &booking.CreatedAt,
             &booking.UpdatedAt,
+            &booking.DepartureTime,
+            &booking.ArrivalTime,
+            &booking.Duration,
+            &booking.DepartureAirportCode,
+            &booking.ArrivalAirportCode,
         )
         if err != nil {
             log.Printf("Error scanning booking: %v", err)

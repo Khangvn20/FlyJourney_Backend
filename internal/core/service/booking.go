@@ -327,7 +327,6 @@ func (s *bookingService) GetAllBookingByUserID(userID int64) *response.Response 
             ErrorMessage: fmt.Sprintf("failed to fetch data: %v", err),
         }
     }
-
     return &response.Response{
         Status:       true,
         ErrorCode:    error_code.Success,
