@@ -79,7 +79,6 @@ func (r *pnrRepository) CreatePnr(pnr *dto.PNR) (*dto.PNR, error) {
     expiresAt := now.Add(24 * time.Hour) 
     pnr.ExpiresAt = &expiresAt
 
-        // Sử dụng hàm GeneratePNR có sẵn
         generatedCode, err := r.GeneratePNR(bookingID)
         if err != nil {
             return nil, fmt.Errorf("failed to generate PNR code: %v", err)
