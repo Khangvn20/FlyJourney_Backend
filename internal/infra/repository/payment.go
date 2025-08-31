@@ -137,7 +137,14 @@ func (r *paymentRepository) GetPaymentByBookingID(bookingID int64) (*dto.Payment
         SELECT payment_id, booking_id, amount, payment_method, status, transaction_id, paid_at
         FROM payments
         WHERE booking_id = $1
-        ORDER BY paid_at DESC
+        ORDER BY 
+            CASE 
+                WHEN status = 'success' THEN 1
+                WHEN status = 'pending' THEN 2
+                WHEN status = 'failed' THEN 3
+                ELSE 4
+            END,
+            paid_at DESC
         LIMIT 1
     `
 

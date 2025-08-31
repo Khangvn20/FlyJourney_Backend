@@ -50,6 +50,11 @@ type UpdateFlightStatusRequest struct {
     Status string `json:"status" binding:"required,oneof=scheduled delayed cancelled boarding departed arrived diverted"`
 }
 
+type UpdateFlightTimeRequest struct {
+    DepartureTime string `json:"departure_time" binding:"required"`
+    ArrivalTime   string `json:"arrival_time" binding:"required"`
+}
+
 type FlightFilterRequest struct {
     AirlineIDs      []int    `json:"airline_ids"`
     MaxStops        int      `json:"max_stops"`
@@ -77,4 +82,9 @@ type GetFlightsByDateRequest struct {
 
 type BatchCreateFlightRequest struct {
     Flights []CreateFlightRequest `json:"flights" binding:"required,dive"`
+}
+type FlightDelayNotificationRequest struct {
+    BookingID        int64  `json:"booking_id"`
+    NewDepartureTime int64  `json:"new_departure_time"`
+    Reason           string `json:"reason"`
 }

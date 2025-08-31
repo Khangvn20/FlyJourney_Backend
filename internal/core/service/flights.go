@@ -1365,3 +1365,68 @@ func (s *flightService) CancelFlight(flightID int64, reason string) *response.Re
         },
     }
 }
+
+
+func (s *flightService) UpdateFlightTime(flightID int64, req *request.UpdateFlightTimeRequest) *response.Response {
+    // Parse departure time
+    departureTime, err := utils.ParseTime(req.DepartureTime)
+    if err != nil {
+        log.Printf("Error parsing departure time: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid departure time format",
+        }
+    }
+
+    // Parse arrival time
+    arrivalTime, err := utils.ParseTime(req.ArrivalTime)
+    if err != nil {
+        log.Printf("Error parsing arrival time: %v", err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid arrival time format",
+        }
+    }
+
+    // Validate that arrival time is after departure time
+    if arrivalTime.Before(departureTime) {
+        log.Printf("Invalid flight times: arrival time %v is before departure time %v", arrivalTime, departureTime)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Arrival time must be after departure time",
+        }
+    }
+
+    // Call repository to update flight time
+    err = s.flightRepo.UpdateFlightTime(int(flightID), departureTime, arrivalTime)
+    if err != nil {
+        log.Printf("Error updating flight times for flight %d: %v", flightID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Failed to update flight times",
+        }
+    }
+
+    // Calculate duration
+    duration := arrivalTime.Sub(departureTime)
+    durationMinutes := int(duration.Minutes())
+
+    log.Printf("Successfully updated flight %d: departure_time=%v, arrival_time=%v, duration=%d minutes",
+        flightID, departureTime, arrivalTime, durationMinutes)
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Flight times updated successfully",
+        Data: map[string]interface{}{
+            "flight_id":        flightID,
+            "departure_time":   departureTime.Format("2006-01-02T15:04:05Z"),
+            "arrival_time":     arrivalTime.Format("2006-01-02T15:04:05Z"),
+            "duration_minutes": durationMinutes,
+        },
+    }
+}

@@ -4,6 +4,7 @@ import (
     "log"
     "time"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
 )
 
 type EmailNotificationWorker struct {
@@ -124,12 +125,7 @@ func (w *EmailNotificationWorker) processFlightDelayNotifications() {
             continue
         }
 
-        var notification struct {
-            BookingID        int64  `json:"booking_id"`
-            NewDepartureTime int64  `json:"new_departure_time"`
-            Reason           string `json:"reason"`
-        }
-
+        var notification request.FlightDelayNotificationRequest
         if err := json.Unmarshal([]byte(jsonData), &notification); err != nil {
             log.Printf("Error parsing notification data for key %s: %v", key, err)
             continue

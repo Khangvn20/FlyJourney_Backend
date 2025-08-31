@@ -15,4 +15,5 @@ type BookingRepository interface {
     UpdateBookingStatus(bookingID int64, status string) (*dto.Booking, error)
     GetBookingsByFlightID(flightID int64) ([]*dto.Booking, error)
     GetAllBookingByUserID(userID int64) ([]*dto.Booking, error)
+     GetBookingsByFlightIDAndStatus(flightID int64, status string) ([]*dto.Booking, error)
 }

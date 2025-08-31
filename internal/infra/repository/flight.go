@@ -1083,17 +1083,30 @@ func (r *flightRepository) SearchRoundtripFlights(
 func (r *flightRepository) UpdateFlightTime(flightID int, departureTime time.Time, arrivalTime time.Time) error {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
-
+    
+    duration := arrivalTime.Sub(departureTime)
+    durationMinutes := int(duration.Minutes())
+    //check duration minutes
+    if durationMinutes <= 0 {
+    return fmt.Errorf("invalid flight duration: arrival time must be after departure time")
+    }
     query := `
         UPDATE flights
-        SET departure_time = $1, arrival_time = $2, updated_at = $3
-        WHERE flight_id = $4
+        SET departure_time = $1, arrival_time = $2, duration_minutes = $3, updated_at = $4
+        WHERE flight_id = $5
     `
 
-    _, err := r.db.Exec(ctx, query, departureTime, arrivalTime, time.Now(), flightID)
+    commandTag, err := r.db.Exec(ctx, query, departureTime, arrivalTime, durationMinutes, time.Now(), flightID)
     if err != nil {
-        return fmt.Errorf("error updating flight times: %w", err)
+        return fmt.Errorf("error updating flight times and duration: %w", err)
     }
+
+    if commandTag.RowsAffected() == 0 {
+        return fmt.Errorf("flight with ID %d not found", flightID)
+    }
+
+    log.Printf("Successfully updated flight %d: departure_time=%v, arrival_time=%v, duration=%d minutes", 
+     flightID, departureTime, arrivalTime, durationMinutes)
 
     return nil
 }

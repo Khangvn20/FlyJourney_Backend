@@ -186,7 +186,7 @@ func (r *bookingRepository) GetBookingByID(bookingID int64) (*dto.Booking, error
     query := `
         SELECT 
             booking_id, user_id, flight_id, return_flight_id, booking_date, 
-            contact_email, contact_phone, contact_address, note, status, 
+            contact_email, contact_name, contact_phone, contact_address, note, status, 
             total_price,  check_in_status
         FROM bookings
         WHERE booking_id = $1
@@ -200,6 +200,7 @@ func (r *bookingRepository) GetBookingByID(bookingID int64) (*dto.Booking, error
         &booking.ReturnFlightID,
         &booking.BookingDate,
         &booking.ContactEmail,
+        &booking.ContactName,
         &booking.ContactPhone,
         &booking.ContactAddress,
         &booking.Note,
@@ -673,6 +674,58 @@ paymentsQuery := `
                 }
             }
         }
+    }
+
+    return bookings, nil
+}
+func (r *bookingRepository) GetBookingsByFlightIDAndStatus(flightID int64, status string) ([]*dto.Booking, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT DISTINCT 
+            b.booking_id, b.user_id, b.flight_id, b.return_flight_id,
+            b.booking_date, b.contact_email, b.contact_phone, b.contact_address,
+            b.note, b.status, b.total_price, b.check_in_status,
+            b.created_at, b.updated_at, b.contact_name
+        FROM bookings b
+        WHERE (b.flight_id = $1 OR b.return_flight_id = $1)
+        AND b.status = $2
+        ORDER BY b.booking_id
+    `
+
+    rows, err := r.db.Query(ctx, query, flightID, status)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching bookings by flight ID and status: %w", err)
+    }
+    defer rows.Close()
+
+    var bookings []*dto.Booking
+    for rows.Next() {
+        var booking dto.Booking
+        err := rows.Scan(
+            &booking.BookingID,
+            &booking.UserID,
+            &booking.FlightID,
+            &booking.ReturnFlightID,
+            &booking.BookingDate,
+            &booking.ContactEmail,
+            &booking.ContactPhone,
+            &booking.ContactAddress,
+            &booking.Note,
+            &booking.Status,
+            &booking.TotalPrice,
+            &booking.CheckInStatus,
+            &booking.CreatedAt,
+            &booking.UpdatedAt,
+            &booking.ContactName,
+        )
+        if err != nil {
+            log.Printf("Error scanning booking: %v", err)
+            continue
+        }
+
+        bookings = append(bookings, &booking)
     }
 
     return bookings, nil

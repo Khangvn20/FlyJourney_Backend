@@ -1,16 +1,20 @@
 package service
+
 import (
-    "bytes"
-    "fmt"
-    "html/template"
-    "log"
-    "time"  
-    "github.com/dustin/go-humanize"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/repository"
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"log"
+	"time"
+
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/dto"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/repository"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/port/service"
+	"github.com/dustin/go-humanize"
 )
 type bookingEmailService struct {
 	bookingRepo   repository.BookingRepository
@@ -19,6 +23,7 @@ type bookingEmailService struct {
     userRepo      repository.UserRepository
     paymentRepo   repository.PaymentRepository
     emailService  service.EmailOTPService 
+    redisService  service.RedisService
 }
 func NewBookingEmailService(
     bookingRepo repository.BookingRepository,
@@ -27,6 +32,7 @@ func NewBookingEmailService(
     userRepo repository.UserRepository,
     paymentRepo repository.PaymentRepository,
     emailService service.EmailOTPService,
+    redisService service.RedisService,
 ) service.BookingEmailService {
     return &bookingEmailService{
         bookingRepo:  bookingRepo,
@@ -35,6 +41,7 @@ func NewBookingEmailService(
         userRepo:     userRepo,
         paymentRepo:  paymentRepo,
         emailService: emailService,
+        redisService: redisService,
     }
 }
 func (s *bookingEmailService) SendBookingConfirmationEmail(bookingID int64) *response.Response {
@@ -56,15 +63,6 @@ func (s *bookingEmailService) SendBookingConfirmationEmail(bookingID int64) *res
 		}
 	}
 	//get user by id
-	user, err := s.userRepo.GetUserByID(int(booking.UserID))
-    if err != nil {
-        log.Printf("Error fetching user: %v", err)
-        return &response.Response{
-            Status:       false,
-            ErrorCode:    error_code.InternalError,
-            ErrorMessage: "fail to fetch user ID",
-        }
-    }
 
 	pnr, err := s.pnrRepo.GetPnrByBookingID(bookingID)
 	if err != nil {
@@ -84,6 +82,7 @@ func (s *bookingEmailService) SendBookingConfirmationEmail(bookingID int64) *res
         ErrorMessage: "fail to fetch outbound flight",
     }
 }
+    
 	payment, err := s.paymentRepo.GetPaymentByBookingID(bookingID)
 	if err != nil {
 		log.Printf("Error fetching payment: %v", err)
@@ -93,6 +92,8 @@ func (s *bookingEmailService) SendBookingConfirmationEmail(bookingID int64) *res
 			ErrorMessage: "fail to fetch payment",
 		}
 	}
+
+    
 	if payment.Status != "success" {
         log.Printf("Payment not completed for booking ID: %d", bookingID)
         return &response.Response{
@@ -104,9 +105,9 @@ func (s *bookingEmailService) SendBookingConfirmationEmail(bookingID int64) *res
 
     emailData :=&dto.BookingEmailData{
 		
-		 PNRCode:      pnr.PNRCode,
+		PNRCode:     pnr.PNRCode,
         BookingID:    booking.BookingID,
-        UserFullName: user.Name,
+        UserFullName: booking.ContactName,
         ContactEmail: booking.ContactEmail,
         ContactPhone: booking.ContactPhone,
         TotalPrice:  humanize.Comma(int64(booking.TotalPrice)),
@@ -163,8 +164,8 @@ func (s *bookingEmailService) SendBookingConfirmationEmail(bookingID int64) *res
             ErrorMessage: "Không thể tạo nội dung email",
         }
     }
-    subject := fmt.Sprintf("Xác nhận đặt vé - Thông tin chi tiết vé của bạn")
-	 err = s.emailService.(*emailOTPService).SendHTMLMail(booking.ContactEmail, subject, htmlContent)
+    subject := "Xác nhận đặt vé - Thông tin chi tiết vé của bạn"
+    err = s.emailService.(*emailOTPService).SendHTMLMail(booking.ContactEmail, subject, htmlContent)
     if err != nil {
         log.Printf("Error sending confirmation email: %v", err)
         return &response.Response{
@@ -283,13 +284,13 @@ const tmplStr = `
     </div>
 </body>
 </html>`
-    // Tạo template
+  
     tmpl, err := template.New("bookingConfirmation").Parse(tmplStr)
     if err != nil {
         return "", err
     }
 
-    // Render template với dữ liệu
+    
     var buf bytes.Buffer
     if err := tmpl.Execute(&buf, data); err != nil {
         return "", err
@@ -495,7 +496,7 @@ func (s *bookingEmailService) renderCancellationEmailTemplate(data *dto.Cancella
 
 
 func (s *bookingEmailService) SendFlightDelayEmail(bookingID int64, newDepartureTime time.Time, reason string) *response.Response {
-    // Lấy thông tin booking
+
     booking, err := s.bookingRepo.GetBookingByID(bookingID)
     if err != nil {
         log.Printf("error fetch booking: %v", err)
@@ -506,18 +507,6 @@ func (s *bookingEmailService) SendFlightDelayEmail(bookingID int64, newDeparture
         }
     }
 
-    // Lấy thông tin user
-    user, err := s.userRepo.GetUserByID(int(booking.UserID))
-    if err != nil {
-        log.Printf("error fetch user: %v", err)
-        return &response.Response{
-            Status:       false,
-            ErrorCode:    error_code.InternalError,
-            ErrorMessage: "error fetching user",
-        }
-    }
-
-    // Lấy thông tin PNR
     pnr, err := s.pnrRepo.GetPnrByBookingID(bookingID)
     if err != nil {
         log.Printf("error fetch pnr: %v", err)
@@ -528,7 +517,7 @@ func (s *bookingEmailService) SendFlightDelayEmail(bookingID int64, newDeparture
         }
     }
 
-    // Lấy thông tin chuyến bay
+   
     outboundFlight, _, err := s.flightRepo.GetByID(int(booking.FlightID))
     if err != nil {
         log.Printf("Error fetching outbound flight: %v", err)
@@ -559,7 +548,7 @@ func (s *bookingEmailService) SendFlightDelayEmail(bookingID int64, newDeparture
     emailData := &dto.DelayEmailData{
         PNRCode:          pnr.PNRCode,
         BookingID:        booking.BookingID,
-        UserFullName:     user.Name,
+        UserFullName:     booking.ContactName,
         ContactEmail:     booking.ContactEmail,
         ContactPhone:     booking.ContactPhone,
         DelayReason:      reason,
@@ -772,4 +761,165 @@ func (s *bookingEmailService) renderDelayEmailTemplate(data *dto.DelayEmailData)
     }
 
     return buf.String(), nil
+}
+
+func (s *bookingEmailService) SendFlightDelayEmailToAllConfirmedBookings(flightID int64, newDepartureTime time.Time, reason string) *response.Response {
+
+    flight, _, err := s.flightRepo.GetByID(int(flightID))
+    if err != nil {
+        log.Printf("Error fetching flight %d: %v", flightID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.NOTFOUND,
+            ErrorMessage: "Không tìm thấy thông tin chuyến bay",
+        }
+    }
+
+    confirmedBookings, err := s.bookingRepo.GetBookingsByFlightIDAndStatus(flightID, "confirmed")
+    if err != nil {
+        log.Printf("Error fetching confirmed bookings for flight %d: %v", flightID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Lỗi khi lấy danh sách booking",
+        }
+    }
+
+    if len(confirmedBookings) == 0 {
+        return &response.Response{
+            Status:       true,
+            ErrorCode:    error_code.Success,
+            ErrorMessage: "Không có booking nào với trạng thái confirmed",
+            Data: map[string]interface{}{
+                "flight_id":     flightID,
+                "flight_number": flight.FlightNumber,
+                "bookings":      0,
+            },
+        }
+    }
+
+    var results []map[string]interface{}
+    successCount := 0
+    failCount := 0
+
+  
+    for _, booking := range confirmedBookings {
+        emailResult := map[string]interface{}{
+            "booking_id":   booking.BookingID,
+            "email":        booking.ContactEmail,
+            "contact_name": booking.ContactName,
+            "status":       "pending",
+        }
+
+ 
+        response := s.SendFlightDelayEmail(booking.BookingID, newDepartureTime, reason)
+        
+        if response.Status {
+            emailResult["status"] = "sent"
+            successCount++
+        } else {
+            emailResult["status"] = "failed"
+            emailResult["error"] = response.ErrorMessage
+            failCount++
+        }
+
+        results = append(results, emailResult)
+
+
+        time.Sleep(50 * time.Millisecond)
+    }
+
+    log.Printf("Flight delay notification for flight %d: Sent %d successful, %d failed out of %d bookings",
+        flightID, successCount, failCount, len(confirmedBookings))
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: fmt.Sprintf("Đã gửi thông báo đến %d/%d booking thành công", successCount, len(confirmedBookings)),
+        Data: map[string]interface{}{
+            "flight_id":      flightID,
+            "flight_number":  flight.FlightNumber,
+            "bookings_total": len(confirmedBookings),
+            "success":        successCount,
+            "failed":         failCount,
+            "results":        results,
+        },
+    }
+}
+
+func (s *bookingEmailService) QueueFlightDelayNotifications(flightID int64, newDepartureTime time.Time, reason string) *response.Response {
+
+    flight, _, err := s.flightRepo.GetByID(int(flightID))
+    if err != nil {
+        log.Printf("Error fetching flight %d: %v", flightID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.NOTFOUND,
+            ErrorMessage: "Không tìm thấy thông tin chuyến bay",
+        }
+    }
+
+    confirmedBookings, err := s.bookingRepo.GetBookingsByFlightIDAndStatus(flightID, "confirmed")
+    if err != nil {
+        log.Printf("Error fetching confirmed bookings for flight %d: %v", flightID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Lỗi khi lấy danh sách booking",
+        }
+    }
+
+    if len(confirmedBookings) == 0 {
+        return &response.Response{
+            Status:       true,
+            ErrorCode:    error_code.Success,
+            ErrorMessage: "Không có booking nào với trạng thái confirmed",
+            Data: map[string]interface{}{
+                "flight_id":     flightID,
+                "flight_number": flight.FlightNumber,
+                "bookings":      0,
+            },
+        }
+    }
+
+    for _, booking := range confirmedBookings {
+
+        notification := request.FlightDelayNotificationRequest{
+            BookingID:        booking.BookingID,
+            NewDepartureTime: newDepartureTime.Unix(),
+            Reason:           reason,
+        }
+
+   
+        jsonData, err := json.Marshal(notification)
+        if err != nil {
+            log.Printf("Error marshaling notification data for booking %d: %v", booking.BookingID, err)
+            continue
+        }
+
+        key := fmt.Sprintf("notification:delay:%d", booking.BookingID)
+
+        err = s.redisService.Set(key, string(jsonData), 72*time.Hour)
+        if err != nil {
+            log.Printf("Error queueing notification for booking %d: %v", booking.BookingID, err)
+            continue
+        }
+        
+        log.Printf("Successfully queued delay notification for booking %d (email: %s)", 
+            booking.BookingID, booking.ContactEmail)
+    }
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: fmt.Sprintf("Đã thêm %d thông báo vào hàng đợi xử lý", len(confirmedBookings)),
+        Data: map[string]interface{}{
+            "flight_id":       flightID,
+            "flight_number":   flight.FlightNumber,
+            "old_departure":   flight.DepartureTime.Format("02/01/2006 15:04"),
+            "new_departure":   newDepartureTime.Format("02/01/2006 15:04"),
+            "reason":          reason,
+            "bookings_queued": len(confirmedBookings),
+        },
+    }
 }
