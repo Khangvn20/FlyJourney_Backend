@@ -140,45 +140,42 @@ func (r *bookingRepository) CreateBooking(booking *dto.Booking) (*dto.Booking, e
 }
 		booking.Details[i] = detail // Cập nhật detail đã có booking_detail_id
 	}
-    if booking.Ancillaries != nil && len(booking.Ancillaries) > 0 { 
+        if booking.Ancillaries != nil && len(booking.Ancillaries) > 0 { 
         for i, ancillary := range booking.Ancillaries {
             var bookingDetailID int64
-        if len(booking.Details) > 0 {
-            bookingDetailID = booking.Details[0].BookingDetailID
-        } else {
-            return nil, fmt.Errorf("no booking details to attach ancillary")
-        }
+            if len(booking.Details) > 0 {
+                bookingDetailID = booking.Details[0].BookingDetailID
+            } else {
+                return nil, fmt.Errorf("no booking details to attach ancillary")
+            }
+            
             ancillary.CreatedAt = now
-        ancillaryQuery := `
+            ancillaryQuery := `
                 INSERT INTO booking_ancillaries (
                     booking_detail_id, type, description, quantity, 
                     price, created_at
                 ) VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING ancillary_id`
-        err = tx.QueryRow(ctx, ancillaryQuery,
-            bookingDetailID, ancillary.Type, ancillary.Description,
-            ancillary.Quantity, ancillary.Price, ancillary.CreatedAt).Scan(&ancillary.AncillaryID)
-        if err != nil {
-            return nil, fmt.Errorf("error creating ancillary: %w", err)
-        }
-    booking.TotalPrice += ancillary.Price * float64(ancillary.Quantity)
-    //update ancillary with new ID
-    ancillary.BookingDetailID = bookingDetailID
-    booking.Ancillaries[i] = ancillary
-	}
-    //update total price
-    updatePriceQuery := `UPDATE bookings SET total_price = $1 WHERE booking_id = $2`
-        _, err = tx.Exec(ctx, updatePriceQuery, booking.TotalPrice, booking.BookingID)
-        
-        if err != nil {
-            return nil, fmt.Errorf("error updating booking total price: %w", err)
+                
+            err = tx.QueryRow(ctx, ancillaryQuery,
+                bookingDetailID, ancillary.Type, ancillary.Description,
+                ancillary.Quantity, ancillary.Price, ancillary.CreatedAt).Scan(&ancillary.AncillaryID)
+                
+            if err != nil {
+                return nil, fmt.Errorf("error creating ancillary: %w", err)
+            }
+       
+            //update ancillary with new ID
+            ancillary.BookingDetailID = bookingDetailID
+            booking.Ancillaries[i] = ancillary
         }
     }
-	if err = tx.Commit(ctx); err != nil {
+
+    if err = tx.Commit(ctx); err != nil {
         return nil, fmt.Errorf("error committing transaction: %w", err)
     }
-	return booking, nil
-   
+    
+    return booking, nil
 }
 func (r *bookingRepository) GetBookingByID(bookingID int64) (*dto.Booking, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
