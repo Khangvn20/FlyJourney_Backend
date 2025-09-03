@@ -9,6 +9,12 @@ type Booking struct {
 	UserID         int64            `json:"user_id"`
 	FlightID       int64            `json:"flight_id"`
 	ReturnFlightID *int64           `json:"return_flight_id"`
+	ArrivalAirportCode string       `json:"arrival_airport_code"`
+	DepartureAirportCode string    `json:"departure_airport_code"`
+	DepartureTime    time.Time        `json:"departure_time"`
+	AirlineName     string           `json:"airline_name"`
+	Duration       int              `json:"duration"`
+	ArrivalTime	  time.Time        `json:"arrival_time"`
 	BookingDate    time.Time        `json:"booking_date"`
 	ContactEmail   string           `json:"contact_email"`    // Email liên hệ
 	ContactPhone   string           `json:"contact_phone"`    // Số điện thoại liên hệ
