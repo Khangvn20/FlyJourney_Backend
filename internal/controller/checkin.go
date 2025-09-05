@@ -1,9 +1,9 @@
-package controller
+package controller 
 
 import (
     "net/http"
     "log"
-
+    "strconv"
     "github.com/gin-gonic/gin"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
@@ -69,6 +69,39 @@ func (c *CheckinController) ValidateCheckin(ctx *gin.Context) {
     result := c.checkinService.ValidateCheckin(&req)
 
     // Determine HTTP status code based on result
+    statusCode := http.StatusOK
+    if !result.Status {
+        switch result.ErrorCode {
+        case error_code.InvalidRequest:
+            statusCode = http.StatusBadRequest
+        case error_code.NOTFOUND:
+            statusCode = http.StatusNotFound
+        case error_code.InternalError:
+            statusCode = http.StatusInternalServerError
+        default:
+            statusCode = http.StatusInternalServerError
+        }
+    }
+
+    ctx.JSON(statusCode, result)
+}
+
+// CheckSeats - API check confirmed seats by flight ID
+
+func (c *CheckinController) GetSeatMap(ctx *gin.Context) {
+    flightIDStr := ctx.Param("flight_id")
+    flightID, err := strconv.ParseInt(flightIDStr, 10, 64)
+    if err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    error_code.InvalidRequest,
+            "errorMessage": "Invalid flight ID format",
+        })
+        return
+    }
+
+    result := c.checkinService.GetSeatMap(flightID)
+
     statusCode := http.StatusOK
     if !result.Status {
         switch result.ErrorCode {

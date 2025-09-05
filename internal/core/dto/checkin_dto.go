@@ -43,3 +43,16 @@ type CheckinBookingDetail struct {
     IDNumber            string  `json:"id_number"`
     IDType              string  `json:"id_type"`
 }
+
+//Check seat map 
+type ConfirmedSeatInfo struct {
+    SeatNumber     string `json:"seat_number"`
+    FlightClassID  int64  `json:"flight_class_id"`
+    Status         string `json:"status"`
+}
+
+type SeatCheckResponse struct {
+    FlightID        int64               `json:"flight_id"`
+    FlightNumber    string              `json:"flight_number"`
+    ConfirmedSeats  []ConfirmedSeatInfo `json:"confirmed_seats"`
+}

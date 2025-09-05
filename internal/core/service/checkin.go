@@ -26,7 +26,7 @@ func (s *checkinService) ValidateCheckin(req *request.ValidateCheckin) *response
     log.Printf("ValidateCheckin request: PNR=%s, Email=%s, Name=%s", 
         req.PNRCode, req.Email, req.FullName)
 
-    // 1. Lấy PNR info từ repository (data only)
+  
     pnrInfo, err := s.checkinRepo.GetPNRInfo(req.PNRCode)
     if err != nil {
         if err.Error() == "PNR not found" {
@@ -204,5 +204,49 @@ func (s *checkinService) ValidateCheckin(req *request.ValidateCheckin) *response
         ErrorCode:    error_code.Success,
         ErrorMessage: "Checkin validation successful",
         Data:         checkinResponse,
+    }
+}
+
+func (s *checkinService) GetSeatMap(flightID int64) *response.Response {
+    log.Printf("CheckSeats request for FlightID: %d", flightID)
+
+    // Validate input
+    if flightID <= 0 {
+        log.Printf("Invalid FlightID: %d", flightID)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InvalidRequest,
+            ErrorMessage: "Invalid flight ID",
+        }
+    }
+
+
+    seatCheckData, err := s.checkinRepo.GetConfirmedSeatsByFlightID(flightID)
+    if err != nil {
+        if err.Error() == "flight not found" {
+            log.Printf("Flight not found for FlightID: %d", flightID)
+            return &response.Response{
+                Status:       false,
+                ErrorCode:    error_code.NOTFOUND,
+                ErrorMessage: "Flight not found",
+            }
+        }
+
+        log.Printf("Error retrieving confirmed seats for FlightID %d: %v", flightID, err)
+        return &response.Response{
+            Status:       false,
+            ErrorCode:    error_code.InternalError,
+            ErrorMessage: "Failed to retrieve confirmed seats",
+        }
+    }
+
+    log.Printf("Confirmed seats retrieved successfully for FlightID: %d, Total seats: %d", 
+        flightID, len(seatCheckData.ConfirmedSeats))
+
+    return &response.Response{
+        Status:       true,
+        ErrorCode:    error_code.Success,
+        ErrorMessage: "Seatmap data retrieved successfully",
+        Data:         seatCheckData,
     }
 }

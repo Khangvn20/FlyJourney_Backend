@@ -118,3 +118,76 @@ func (r *checkinRepository) GetBookingDetailsForCheckin(bookingID int64) ([]*dto
 
     return details, nil
 }
+
+func (r *checkinRepository) GetConfirmedSeatsByFlightID(flightID int64) (*dto.SeatCheckResponse, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // Query đơn giản để lấy thông tin flight
+    flightQuery := `SELECT flight_id, flight_number FROM flights WHERE flight_id = $1`
+    var flightIDResult int64
+    var flightNumberResult string
+    
+    err := r.db.QueryRow(ctx, flightQuery, flightID).Scan(&flightIDResult, &flightNumberResult)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            log.Printf("Flight not found for FlightID: %d", flightID)
+            return nil, fmt.Errorf("flight not found")
+        }
+        log.Printf("Error getting flight info: %v", err)
+        return nil, fmt.Errorf("error getting flight info: %w", err)
+    }
+
+    // Query đơn giản để lấy ghế confirmed từ bảng seats
+    seatQuery := `
+        SELECT seat_number, flight_class_id, status
+        FROM seats 
+        WHERE flight_id = $1 AND status = 'confirm'
+        ORDER BY seat_number
+    `
+
+    log.Printf("Executing confirmed seats query for FlightID: %d", flightID)
+    
+    rows, err := r.db.Query(ctx, seatQuery, flightID)
+    if err != nil {
+        log.Printf("Error executing confirmed seats query: %v", err)
+        return nil, fmt.Errorf("error querying confirmed seats: %w", err)
+    }
+    defer rows.Close()
+
+    var confirmedSeats []dto.ConfirmedSeatInfo
+
+    for rows.Next() {
+        var seatNumber string
+        var flightClassID int64
+        var status string
+
+        err := rows.Scan(&seatNumber, &flightClassID, &status)
+        if err != nil {
+            log.Printf("Error scanning confirmed seat row: %v", err)
+            continue
+        }
+
+        confirmedSeat := dto.ConfirmedSeatInfo{
+            SeatNumber:    seatNumber,
+            FlightClassID: flightClassID,
+            Status:        status,
+        }
+        confirmedSeats = append(confirmedSeats, confirmedSeat)
+    }
+
+    if err := rows.Err(); err != nil {
+        log.Printf("Error iterating rows for FlightID %d: %v", flightID, err)
+        return nil, fmt.Errorf("error iterating rows: %w", err)
+    }
+
+    response := &dto.SeatCheckResponse{
+        FlightID:       flightIDResult,
+        FlightNumber:   flightNumberResult,
+        ConfirmedSeats: confirmedSeats,
+    }
+
+    log.Printf("Retrieved %d confirmed seats for FlightID: %d", len(confirmedSeats), flightID)
+    
+    return response, nil
+}

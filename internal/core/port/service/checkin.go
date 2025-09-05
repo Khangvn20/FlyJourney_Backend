@@ -7,4 +7,5 @@ import (
 
 type CheckinService interface {
 	ValidateCheckin(req *request.ValidateCheckin) *response.Response
+	GetSeatMap(flightID int64) *response.Response
 }
