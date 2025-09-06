@@ -85,6 +85,7 @@ func NewHTTPServer(port int) (*Server, error) {
     flightRepo := repository.NewFlightRepository(db.GetPool())
     paymentRepo := repository.NewPaymentRepository(db.GetPool())
     pnrRepo     :=repository.NewPNRRepository(db.GetPool())
+    checkinRepo := repository.NewCheckinRepository(db.GetPool())
     // Initialize services
     redisService := service.NewRedisService(redisClient)
     bookingService := service.NewBookingService(bookingRepo,redisService, pnrRepo)
@@ -94,13 +95,14 @@ func NewHTTPServer(port int) (*Server, error) {
     flightService := service.NewFlightService(flightRepo,redisService, bookingRepo)
     bookingEmailService := service.NewBookingEmailService(bookingRepo, flightRepo, pnrRepo, userRepo, paymentRepo, emailOTPService, redisService)
     paymentService := service.NewPaymentService(momoConfig, bookingRepo, paymentRepo, bookingEmailService)
-
+    checkinService := service.NewCheckinService(checkinRepo,bookingRepo)
     // Initialize controller
     bookingController := controller.NewBookingController(bookingService)
     userController := controller.NewUserController(userService)
     flightController := controller.NewFlightController(flightService,bookingEmailService)
     paymentController := controller.NewPaymentController(paymentService)
     bookingEmailController := controller.NewEmailController(bookingEmailService)
+    checkinController := controller.NewCheckinController(checkinService)
     //Initialize Notification Worker
     emailNotificationWorker := worker.NewEmailNotificationWorker(redisService, bookingEmailService, 5*time.Minute)
     emailNotificationWorker.Start()
@@ -119,6 +121,7 @@ func NewHTTPServer(port int) (*Server, error) {
     router.BookingRoutes(apiV1, bookingController, middleware.AuthMiddleware(tokenService))
     router.PaymentRoutes(apiV1, paymentController, middleware.AuthMiddleware(tokenService))
     router.BookingEmailRoute(apiV1, bookingEmailController,)
+    router.CheckinRoutes(apiV1, checkinController)
 
     
     return &Server{

@@ -573,15 +573,398 @@ curl -X POST http://localhost:8080/api/v1/auth/logout \
 
 Import collection với các endpoints trên vào Postman:
 
-1. Set base URL: `http://localhost:8080/api/v1`
+1. Set base URL: `http://localhost:3000/api/v1`
 2. Login để lấy JWT token
 3. Set Authorization header cho các protected endpoints
 4. Test các scenarios khác nhau
 
 **Environment Variables:**
-- `base_url`: `http://localhost:8080/api/v1`
+- `base_url`: `http://localhost:3000/api/v1`
 - `jwt_token`: `<token_from_login_response>`
 
 ---
+---
 
+# Check-in APIs
+
+## 8. Validate Check-in
+Xác thực tính hợp lệ của check-in bằng mã PNR, email và tên hành khách.
+
+**Endpoint:** `POST /checkin/validate`  
+**Authentication:** Required
+
+### Headers
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "pnr_code": "ZJUI8237**RS",
+  "email": "khoitp.125010122009@vtc.edu.vn",
+  "full_name": "Tran Phuong Khoi"
+}
+```
+
+### Request Parameters
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| pnr_code | string | ✅ | Mã PNR booking |
+| email | string | ✅ | Email liên hệ khi đặt vé |
+| full_name | string | ✅ | Tên đầy đủ hành khách |
+
+### Response Example - Success
+```json
+{
+  "status": true,
+  "errorCode": "SUCCESS",
+  "errorMessage": "Checkin validation successful",
+  "data": {
+    "is_eligible": true,
+    "pnr_code": "ZJUI8237**RS",
+    "flight_id": 75,
+    "flight_number": "VJ1173",
+    "departure_time": "2025-08-01T21:55:00Z",
+    "arrival_time": "2025-08-02T00:05:00Z",
+    "departure_airport": "Sân Bay Nội Bài(HAN)",
+    "arrival_airport": "Sân Bay Tân Sơn Nhất(SGN)",
+    "airline_name": "VietJet Air",
+    "booking_details": [
+      {
+        "booking_detail_id": 159,
+        "passenger_name": "Tran Phuong Khoi",
+        "passenger_age": 35,
+        "passenger_gender": "Male",
+        "id_number": "123456789",
+        "id_type": "Passport",
+        "flight_class_name": "Economy",
+        "seat_number": "12A",
+        "is_checked_in": false
+      }
+    ]
+  }
+}
+```
+
+### Response Example - PNR Not Found
+```json
+{
+  "status": true,
+  "errorCode": "SUCCESS",
+  "errorMessage": "",
+  "data": {
+    "is_eligible": false,
+    "error_message": "PNR code not found",
+    "pnr_code": "INVALID123"
+  }
+}
+```
+
+### Response Example - Check-in Not Eligible
+```json
+{
+  "status": true,
+  "errorCode": "SUCCESS",
+  "errorMessage": "",
+  "data": {
+    "is_eligible": false,
+    "error_message": "Email or name does not match booking information",
+    "pnr_code": "ZJUI8237**RS",
+    "flight_number": "VJ1173"
+  }
+}
+```
+
+---
+
+## 9. Get Confirmed Seats Map
+Lấy sơ đồ ghế đã được xác nhận (confirmed) cho một chuyến bay.
+
+**Endpoint:** `GET /checkin/seats/{flight_id}`  
+**Authentication:** Required
+
+### Headers
+```
+Authorization: Bearer <jwt_token>
+```
+
+### Path Parameters
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| flight_id | int64 | ID của chuyến bay |
+
+### Response Example - Success
+```json
+{
+  "status": true,
+  "errorCode": "SUCCESS",
+  "errorMessage": "Seatmap data retrieved successfully",
+  "data": {
+    "flight_id": 75,
+    "flight_number": "VJ1173",
+    "confirmed_seats": [
+      {
+        "seat_number": "1A",
+        "flight_class_id": 56,
+        "status": "confirm"
+      },
+      {
+        "seat_number": "1B",
+        "flight_class_id": 57,
+        "status": "confirm"
+      },
+      {
+        "seat_number": "1C",
+        "flight_class_id": 57,
+        "status": "confirm"
+      },
+      {
+        "seat_number": "2A",
+        "flight_class_id": 57,
+        "status": "confirm"
+      },
+      {
+        "seat_number": "2B",
+        "flight_class_id": 57,
+        "status": "confirm"
+      }
+    ]
+  }
+}
+```
+
+### Response Example - No Confirmed Seats
+```json
+{
+  "status": true,
+  "errorCode": "SUCCESS",
+  "errorMessage": "Seatmap data retrieved successfully",
+  "data": {
+    "flight_id": 75,
+    "flight_number": "VJ1173",
+    "confirmed_seats": []
+  }
+}
+```
+
+### Response Example - Flight Not Found
+```json
+{
+  "status": false,
+  "errorCode": "NOT_FOUND",
+  "errorMessage": "Flight not found"
+}
+```
+
+---
+
+## Check-in Data Models
+
+### CheckinValidationRequest
+```json
+{
+  "pnr_code": "string",
+  "email": "string",
+  "full_name": "string"
+}
+```
+
+### CheckinValidationResponse
+```json
+{
+  "is_eligible": "boolean",
+  "error_message": "string (optional)",
+  "pnr_code": "string",
+  "flight_id": "int64 (optional)",
+  "flight_number": "string (optional)",
+  "departure_time": "string (ISO 8601, optional)",
+  "arrival_time": "string (ISO 8601, optional)",
+  "departure_airport": "string (optional)",
+  "arrival_airport": "string (optional)",
+  "airline_name": "string (optional)",
+  "booking_details": ["CheckinBookingDetail[] (optional)"]
+}
+```
+
+### CheckinBookingDetail
+```json
+{
+  "booking_detail_id": "int64",
+  "passenger_name": "string",
+  "passenger_age": "int",
+  "passenger_gender": "string",
+  "id_number": "string",
+  "id_type": "string",
+  "flight_class_name": "string",
+  "seat_number": "string (nullable)",
+  "is_checked_in": "boolean"
+}
+```
+
+### SeatCheckResponse
+```json
+{
+  "flight_id": "int64",
+  "flight_number": "string",
+  "confirmed_seats": ["ConfirmedSeatInfo[]"]
+}
+```
+
+### ConfirmedSeatInfo
+```json
+{
+  "seat_number": "string",
+  "flight_class_id": "int64",
+  "status": "string"
+}
+```
+
+---
+
+## Check-in Business Rules
+
+### Validation Rules
+1. **PNR Code**: Phải tồn tại trong hệ thống
+2. **Email**: Phải khớp chính xác với email booking (case insensitive)
+3. **Full Name**: Phải khớp với tên trong booking details
+4. **Booking Status**: Booking phải ở trạng thái `confirmed` hoặc `paid`
+5. **Flight Status**: Chuyến bay phải ở trạng thái hợp lệ để check-in
+
+### Seat Map Rules
+1. **Status Filter**: Chỉ hiển thị ghế có status = `confirm`
+2. **Flight Validation**: Flight ID phải tồn tại trong hệ thống
+3. **Sorting**: Ghế được sắp xếp theo seat_number (1A, 1B, 1C, 2A, 2B...)
+4. **Flight Class**: Hiển thị flight_class_id để phân biệt hạng ghế
+
+---
+
+## Check-in Examples
+
+### Curl Examples
+
+#### Validate Check-in
+```bash
+curl -X POST http://localhost:8080/api/v1/checkin/validate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{
+    "pnr_code": "ZJUI8237**RS",
+    "email": "khoitp.125010122009@vtc.edu.vn",
+    "full_name": "Tran Phuong Khoi"
+  }'
+```
+
+#### Get Confirmed Seats Map
+```bash
+curl -X GET http://localhost:8080/api/v1/checkin/seats/75 \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+### Postman Examples
+
+#### Validate Check-in
+```
+POST {{base_url}}/checkin/validate
+Authorization: Bearer {{jwt_token}}
+Content-Type: application/json
+
+{
+  "pnr_code": "ZJUI8237**RS",
+  "email": "khoitp.125010122009@vtc.edu.vn", 
+  "full_name": "Tran Phuong Khoi"
+}
+```
+
+#### Get Confirmed Seats Map
+```
+GET {{base_url}}/checkin/seats/75
+Authorization: Bearer {{jwt_token}}
+```
+
+---
+
+## Check-in Error Responses
+
+### Invalid Request
+```json
+{
+  "status": false,
+  "errorCode": "INVALID_REQUEST",
+  "errorMessage": "PNR code is required"
+}
+```
+
+### PNR Not Found
+```json
+{
+  "status": true,
+  "errorCode": "SUCCESS",
+  "errorMessage": "",
+  "data": {
+    "is_eligible": false,
+    "error_message": "PNR code not found",
+    "pnr_code": "INVALID123"
+  }
+}
+```
+
+### Email/Name Mismatch
+```json
+{
+  "status": true,
+  "errorCode": "SUCCESS",
+  "errorMessage": "",
+  "data": {
+    "is_eligible": false,
+    "error_message": "Email or name does not match booking information",
+    "pnr_code": "ZJUI8237**RS"
+  }
+}
+```
+
+### Flight Not Found (Seat Map)
+```json
+{
+  "status": false,
+  "errorCode": "NOT_FOUND",
+  "errorMessage": "Flight not found"
+}
+```
+
+### Internal Server Error
+```json
+{
+  "status": false,
+  "errorCode": "INTERNAL_ERROR",
+  "errorMessage": "Failed to retrieve passenger information"
+}
+```
+
+---
+
+## Check-in Use Cases
+
+### Successful Check-in Validation Flow
+1. User nhập PNR code, email, và full name
+2. System validate PNR tồn tại
+3. System check email và name khớp với booking
+4. System check booking status (confirmed/paid)
+5. System trả về thông tin flight và passenger details
+6. User có thể tiến hành check-in
+
+### Seat Map Visualization Flow
+1. Admin/Staff muốn xem sơ đồ ghế đã confirmed
+2. Gọi API với flight_id
+3. System trả về danh sách ghế đã được booking và confirmed
+4. Frontend hiển thị sơ đồ ghế với trạng thái occupied/available
+
+### Error Handling Flow
+1. **PNR không tồn tại**: Hiển thị message "PNR code not found"
+2. **Email/Name không khớp**: Hiển thị message "Email or name does not match"
+3. **Flight không tồn tại**: HTTP 404 với message "Flight not found"
+4. **Server error**: HTTP 500 với message generic
+
+---
 *Lưu ý: Tài liệu này được cập nhật theo phiên bản API hiện tại. Kiểm tra changelog để biết các thay đổi mới nhất.*
