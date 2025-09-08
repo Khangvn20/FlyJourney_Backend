@@ -3,6 +3,7 @@ package controller
 import (
     "net/http"
     "log"
+    "fmt"
     "strconv"
     "github.com/gin-gonic/gin"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/entity/error_code"
@@ -116,5 +117,84 @@ func (c *CheckinController) GetSeatMap(ctx *gin.Context) {
         }
     }
 
+    ctx.JSON(statusCode, result)
+}
+
+func (c *CheckinController) ProcessOnlineCheckin(ctx *gin.Context) {
+        log.Printf("ProcessOnlineCheckin API called")
+
+    // 1. Parse request body
+    var req request.OnlineCheckinRequest
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        log.Printf("Invalid request body: %v", err)
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    error_code.InvalidRequest,
+            "errorMessage": "Invalid request format: " + err.Error(),
+        })
+        return
+    }
+
+    // 2. Validate required fields
+    if req.BookingID <= 0 {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    error_code.InvalidRequest,
+            "errorMessage": "Booking ID is required",
+        })
+        return
+    }
+
+    if len(req.Checkins) == 0 {
+        ctx.JSON(http.StatusBadRequest, gin.H{
+            "status":       false,
+            "errorCode":    error_code.InvalidRequest,
+            "errorMessage": "At least one check-in detail is required",
+        })
+        return
+    }
+
+    // Validate each check-in detail
+    for i, checkin := range req.Checkins {
+        if checkin.BookingDetailID <= 0 {
+            ctx.JSON(http.StatusBadRequest, gin.H{
+                "status":       false,
+                "errorCode":    error_code.InvalidRequest,
+                "errorMessage": fmt.Sprintf("Invalid booking detail ID at index %d", i),
+            })
+            return
+        }
+
+        if checkin.SeatNumber == "" {
+            ctx.JSON(http.StatusBadRequest, gin.H{
+                "status":       false,
+                "errorCode":    error_code.InvalidRequest,
+                "errorMessage": fmt.Sprintf("Seat number is required at index %d", i),
+            })
+            return
+        }
+    }
+
+    log.Printf("Processing online check-in for BookingID: %d with %d passengers", req.BookingID, len(req.Checkins))
+
+    // 3. Call service
+    result := c.checkinService.ProcessOnlineCheckin(&req)
+
+    // 4. Determine HTTP status code based on result
+    statusCode := http.StatusOK
+    if !result.Status {
+        switch result.ErrorCode {
+        case error_code.InvalidRequest:
+            statusCode = http.StatusBadRequest
+        case error_code.NOTFOUND:
+            statusCode = http.StatusNotFound
+        case error_code.InternalError:
+            statusCode = http.StatusInternalServerError
+        default:
+            statusCode = http.StatusInternalServerError
+        }
+    }
+
+    // 5. Return response
     ctx.JSON(statusCode, result)
 }

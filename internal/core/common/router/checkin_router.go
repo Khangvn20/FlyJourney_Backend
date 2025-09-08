@@ -9,5 +9,6 @@ func CheckinRoutes(r *gin.RouterGroup, checkinController *controller.CheckinCont
     {
         checkinRoutes.POST("/validate", checkinController.ValidateCheckin)
         checkinRoutes.GET("/:flight_id",checkinController.GetSeatMap)
+        checkinRoutes.POST("/online",checkinController.ProcessOnlineCheckin)
 	}  
 } 
