@@ -140,11 +140,12 @@ func (r *checkinRepository) GetConfirmedSeatsByFlightID(flightID int64) (*dto.Se
 
     // Query đơn giản để lấy ghế confirmed từ bảng seats
     seatQuery := `
-        SELECT seat_number, flight_class_id, status
-        FROM seats 
-        WHERE flight_id = $1 AND status = 'confirm'
-        ORDER BY seat_number
-    `
+    SELECT s.seat_number, s.flight_class_id, s.status, fc.class, fc.fare_class_code
+    FROM seats s
+    JOIN flight_classes fc ON s.flight_class_id = fc.flight_class_id
+    WHERE s.flight_id = $1 AND s.status = 'confirm'
+    ORDER BY s.seat_number
+`
 
     log.Printf("Executing confirmed seats query for FlightID: %d", flightID)
     
@@ -158,21 +159,25 @@ func (r *checkinRepository) GetConfirmedSeatsByFlightID(flightID int64) (*dto.Se
     var confirmedSeats []dto.ConfirmedSeatInfo
 
     for rows.Next() {
-        var seatNumber string
-        var flightClassID int64
-        var status string
+    var seatNumber string
+    var flightClassID int64
+    var status string
+    var class string
+    var fareClassCode string
 
-        err := rows.Scan(&seatNumber, &flightClassID, &status)
-        if err != nil {
-            log.Printf("Error scanning confirmed seat row: %v", err)
-            continue
-        }
+    err := rows.Scan(&seatNumber, &flightClassID, &status, &class, &fareClassCode)
+    if err != nil {
+        log.Printf("Error scanning confirmed seat row: %v", err)
+        continue
+    }
 
-        confirmedSeat := dto.ConfirmedSeatInfo{
-            SeatNumber:    seatNumber,
-            FlightClassID: flightClassID,
-            Status:        status,
-        }
+    confirmedSeat := dto.ConfirmedSeatInfo{
+        SeatNumber:    seatNumber,
+        FlightClassID: flightClassID,
+        Status:        status,
+        Class:         class,         
+        FareClassCode: fareClassCode, 
+    }
         confirmedSeats = append(confirmedSeats, confirmedSeat)
     }
 
@@ -190,4 +195,166 @@ func (r *checkinRepository) GetConfirmedSeatsByFlightID(flightID int64) (*dto.Se
     log.Printf("Retrieved %d confirmed seats for FlightID: %d", len(confirmedSeats), flightID)
     
     return response, nil
+}
+func (r *checkinRepository) CheckSeatOccupied(flightID int64, seatNumber string) (bool, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT EXISTS(
+            SELECT 1 FROM seats 
+            WHERE flight_id = $1 AND seat_number = $2 AND status = 'confirm'
+        )
+    `
+    
+    var occupied bool
+    err := r.db.QueryRow(ctx, query, flightID, seatNumber).Scan(&occupied)
+    if err != nil {
+        return false, fmt.Errorf("error checking seat occupancy: %w", err)
+    }
+    
+    return occupied, nil
+}
+
+// CheckAlreadyCheckedIn - Kiểm tra đã check-in chưa
+func (r *checkinRepository) CheckAlreadyCheckedIn(bookingDetailID int64) (bool, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `SELECT EXISTS(SELECT 1 FROM check_ins WHERE booking_detail_id = $1)`
+    
+    var checkedIn bool
+    err := r.db.QueryRow(ctx, query, bookingDetailID).Scan(&checkedIn)
+    return checkedIn, err
+}
+
+// AssignSeatToBookingDetail - Gán ghế cho passenger và tạo record trong seats table
+func (r *checkinRepository) AssignSeatToBookingDetail(bookingDetailID int64, seatNumber string, flightID int64) error {
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    tx, err := r.db.Begin(ctx)
+    if err != nil {
+        return fmt.Errorf("error starting transaction: %w", err)
+    }
+    defer tx.Rollback(ctx)
+
+    // 1. Lấy flight_class_id từ booking_detail
+    var flightClassID int64
+    flightClassQuery := `SELECT flight_class_id FROM booking_details WHERE booking_detail_id = $1`
+    err = tx.QueryRow(ctx, flightClassQuery, bookingDetailID).Scan(&flightClassID)
+    if err != nil {
+        return fmt.Errorf("error getting flight class: %w", err)
+    }
+
+    // 2. Insert seat record vào database (tạo mới)
+    insertSeatQuery := `
+        INSERT INTO seats (flight_id, flight_class_id, seat_number, status)
+        VALUES ($1, $2, $3, 'confirm')
+        RETURNING seat_id
+    `
+    var seatID int64
+    err = tx.QueryRow(ctx, insertSeatQuery, flightID, flightClassID, seatNumber).Scan(&seatID)
+    if err != nil {
+        return fmt.Errorf("error creating seat record: %w", err)
+    }
+
+    // 3. Update booking_details với seat_id
+    updateBookingQuery := `
+        UPDATE booking_details 
+        SET seat_id = $1
+        WHERE booking_detail_id = $2
+    `
+    _, err = tx.Exec(ctx, updateBookingQuery, seatID, bookingDetailID)
+    if err != nil {
+        return fmt.Errorf("error updating booking detail: %w", err)
+    }
+
+    return tx.Commit(ctx)
+}
+
+// CreateCheckinRecord - Tạo record check-in
+func (r *checkinRepository) CreateCheckinRecord(checkinData *dto.CheckinDTO) (*dto.CheckinDTO, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+ 
+    query := `
+        INSERT INTO check_ins (
+            booking_detail_id, seat_id, flight_id, status, check_in_time, 
+            boarding_pass_code, check_in_method, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING check_in_id
+    `
+    
+    err := r.db.QueryRow(ctx, query,
+        checkinData.BookingDetailId, checkinData.SeatID, checkinData.FlightID, checkinData.Status,
+        checkinData.CheckinTIme, checkinData.BoardingPassCode, checkinData.CheckinMethod,
+        checkinData.CreatedAt, checkinData.UpdateAt,
+    ).Scan(&checkinData.CheckinID)
+    
+    return checkinData, err
+}
+
+// GetFlightInfoByBooking - Lấy thông tin flight từ booking
+func (r *checkinRepository) GetFlightInfoByBooking(bookingID int64) (*dto.FlightBasicInfo, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT b.flight_id, f.flight_number, f.departure_time, b.status
+        FROM bookings b
+        JOIN flights f ON b.flight_id = f.flight_id
+        WHERE b.booking_id = $1
+    `
+    
+    var flight dto.FlightBasicInfo
+    err := r.db.QueryRow(ctx, query, bookingID).Scan(
+        &flight.FlightID, &flight.FlightNumber, 
+        &flight.DepartureTime, &flight.BookingStatus,
+    )
+    
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, fmt.Errorf("booking not found")
+        }
+        return nil, fmt.Errorf("error getting flight info: %w", err)
+    }
+    
+    return &flight, nil
+}
+
+// ValidateBookingDetailOwnership - Validate booking detail thuộc về booking
+func (r *checkinRepository) ValidateBookingDetailOwnership(bookingDetailID int64, bookingID int64) (*dto.PassengerInfo, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT bd.booking_detail_id, bd.first_name, bd.last_name, fc.class
+        FROM booking_details bd
+        JOIN flight_classes fc ON bd.flight_class_id = fc.flight_class_id
+        WHERE bd.booking_detail_id = $1 AND bd.booking_id = $2
+    `
+    
+    var passenger dto.PassengerInfo
+    var firstName, lastName string
+    
+    err := r.db.QueryRow(ctx, query, bookingDetailID, bookingID).Scan(
+        &passenger.BookingDetailID, &firstName, &lastName, &passenger.FlightClassName,
+    )
+    
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, fmt.Errorf("booking detail not found or doesn't belong to this booking")
+        }
+        return nil, fmt.Errorf("error validating ownership: %w", err)
+    }
+    
+    passenger.PassengerName = fmt.Sprintf("%s %s", firstName, lastName)
+    return &passenger, nil
+}
+
+// Helper function
+func (r *checkinRepository) generateBoardingPassCode() string {
+    return fmt.Sprintf("BP%d%d", time.Now().Unix()%10000, time.Now().Nanosecond()%1000)
 }

@@ -42,27 +42,18 @@ func (r *pnrRepository) generateRandomPNRCode() string {
 
     const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     const numbers = "0123456789"
-    const specialChars = "!@#$%^&*"
-    code := make([]byte, 12)
-  for i := 0; i < 4; i++ {
-        code[i] = letters[rand.Intn(len(letters))]
-    }
-
-
-    for i := 4; i < 8; i++ {
+    
+     code := make([]byte, 6)
+    
+    // 2 chữ cái đầu
+    code[0] = letters[rand.Intn(len(letters))]
+    code[1] = letters[rand.Intn(len(letters))]
+    
+    // 4 số cuối
+    for i := 2; i < 6; i++ {
         code[i] = numbers[rand.Intn(len(numbers))]
     }
-
-    for i := 8; i < 10; i++ {
-        code[i] = specialChars[rand.Intn(len(specialChars))]
-    }
-
-
-    for i := 10; i < 12; i++ {
-        code[i] = letters[rand.Intn(len(letters))]
-    }
-
-    return string(code)
+        return string(code)
 }
 func (r *pnrRepository) CreatePnr(pnr *dto.PNR) (*dto.PNR, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

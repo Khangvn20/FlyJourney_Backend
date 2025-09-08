@@ -6,6 +6,7 @@ import (
 
 type Booking struct {
 	BookingID      int64            `json:"booking_id"`
+	PNRCode   string `json:"pnr_code"` 
 	UserID         int64            `json:"user_id"`
 	FlightID       int64            `json:"flight_id"`
 	ReturnFlightID *int64           `json:"return_flight_id"`
