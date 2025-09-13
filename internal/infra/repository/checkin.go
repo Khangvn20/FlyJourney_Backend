@@ -61,6 +61,28 @@ func (r *checkinRepository) GetPNRInfo(pnrCode string) (*dto.PNRInfo, error) {
     return &pnrInfo, nil
 }
 
+func (r *checkinRepository) HasAnyCheckedInPassenger(bookingID int64) (bool, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    query := `
+        SELECT EXISTS (
+            SELECT 1 
+            FROM check_ins ci
+            JOIN booking_details bd ON ci.booking_detail_id = bd.booking_detail_id
+            WHERE bd.booking_id = $1
+        )
+    `
+    
+    var hasCheckedIn bool
+    err := r.db.QueryRow(ctx, query, bookingID).Scan(&hasCheckedIn)
+    if err != nil {
+        log.Printf("Error checking if booking has checked in passengers: %v", err)
+        return false, err
+    }
+    
+    return hasCheckedIn, nil
+}
 // GetBookingDetailsForCheckin - CHỈ lấy booking details
 func (r *checkinRepository) GetBookingDetailsForCheckin(bookingID int64) ([]*dto.CheckinBookingDetail, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -358,3 +380,169 @@ func (r *checkinRepository) ValidateBookingDetailOwnership(bookingDetailID int64
 func (r *checkinRepository) generateBoardingPassCode() string {
     return fmt.Sprintf("BP%d%d", time.Now().Unix()%10000, time.Now().Nanosecond()%1000)
 }
+
+func (r *checkinRepository) ProcessCheckinOnline(checkinRequest *dto.CheckinOnline) (*dto.OnlineCheckinResponse, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+    defer cancel()
+
+    log.Printf("Starting atomic checkin for BookingDetailID: %d, SeatNumber: %s", 
+        checkinRequest.BookingDetailID, checkinRequest.SeatNumber)
+
+    // BEGIN TRANSACTION
+    tx, err := r.db.Begin(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("error starting transaction: %w", err)
+    }
+    
+    // Ensure transaction is rolled back if not committed
+    defer func() {
+        if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+            log.Printf("Error rolling back transaction: %v", err)
+        }
+    }()
+
+    // STEP 1: Lock and check seat availability (prevent race conditions)
+    var occupied bool
+    checkSeatQuery := `
+        SELECT EXISTS(
+            SELECT 1 FROM seats 
+            WHERE flight_id = $1 AND seat_number = $2 AND status = 'confirm'
+        ) FOR UPDATE
+    `
+    err = tx.QueryRow(ctx, checkSeatQuery, checkinRequest.FlightID, checkinRequest.SeatNumber).Scan(&occupied)
+    if err != nil {
+        log.Printf("Error checking seat occupancy in transaction: %v", err)
+        return nil, fmt.Errorf("error checking seat occupancy: %w", err)
+    }
+    
+    if occupied {
+        log.Printf("Seat %s is occupied in transaction check", checkinRequest.SeatNumber)
+        return nil, fmt.Errorf("seat %s is already occupied", checkinRequest.SeatNumber)
+    }
+
+    var flightClassID int64
+    var firstName, lastName string
+    var bookingID int64
+    passengerQuery := `
+        SELECT bd.flight_class_id, bd.first_name, bd.last_name, bd.booking_id
+        FROM booking_details bd
+        WHERE bd.booking_detail_id = $1 FOR UPDATE
+    `
+    err = tx.QueryRow(ctx, passengerQuery, checkinRequest.BookingDetailID).Scan(
+        &flightClassID, &firstName, &lastName, &bookingID)
+    if err != nil {
+        log.Printf("Error getting passenger info: %v", err)
+        return nil, fmt.Errorf("error getting passenger info: %w", err)
+    }
+
+    // STEP 3: Insert seat record
+    insertSeatQuery := `
+        INSERT INTO seats (flight_id, flight_class_id, seat_number, status)
+        VALUES ($1, $2, $3, 'confirm')
+        RETURNING seat_id
+    `
+    var seatID int64
+    err = tx.QueryRow(ctx, insertSeatQuery, 
+    checkinRequest.FlightID, flightClassID, checkinRequest.SeatNumber,
+).Scan(&seatID)
+    if err != nil {
+        log.Printf("Error creating seat record: %v", err)
+        return nil, fmt.Errorf("error creating seat record: %w", err)
+    }
+    log.Printf("Created seat record with ID: %d", seatID)
+
+    // STEP 4: Update booking_details with seat_id
+    updateBookingQuery := `
+    UPDATE booking_details 
+    SET seat_id = $1
+    WHERE booking_detail_id = $2
+`
+_, err = tx.Exec(ctx, updateBookingQuery, seatID, checkinRequest.BookingDetailID)
+    if err != nil {
+        log.Printf("Error updating booking detail: %v", err)
+        return nil, fmt.Errorf("error updating booking detail: %w", err)
+    }
+    log.Printf("Updated booking detail with seat_id: %d", seatID)
+
+    // STEP 5: Create check-in record
+    insertCheckinQuery := `
+        INSERT INTO check_ins (
+            booking_detail_id, seat_id, flight_id, status, check_in_time, 
+            boarding_pass_code, check_in_method, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING check_in_id
+    `
+    var checkinID int64
+    err = tx.QueryRow(ctx, insertCheckinQuery,
+        checkinRequest.BookingDetailID, seatID, checkinRequest.FlightID, "checked_in",
+        checkinRequest.CheckinTime, checkinRequest.BoardingPassCode, "online",
+        checkinRequest.CheckinTime, checkinRequest.CheckinTime,
+    ).Scan(&checkinID)
+    if err != nil {
+        log.Printf("Error creating checkin record: %v", err)
+        return nil, fmt.Errorf("error creating checkin record: %w", err)
+    }
+    log.Printf("Created checkin record with ID: %d", checkinID)
+
+
+    var flightNumber string
+    var departureTime time.Time
+    flightInfoQuery := `
+    SELECT f.flight_number, f.departure_time
+    FROM flights f
+    JOIN bookings b ON b.flight_id = f.flight_id
+    WHERE f.flight_id = $1 AND b.booking_id = $2
+`
+    err = tx.QueryRow(ctx, flightInfoQuery, checkinRequest.FlightID, bookingID).Scan(
+        &flightNumber, &departureTime)
+    if err != nil {
+        log.Printf("Error getting flight info: %v", err)
+        return nil, fmt.Errorf("error getting flight info: %w", err)
+    }
+
+
+    var flightClassName string
+    classQuery := `SELECT class FROM flight_classes WHERE flight_class_id = $1`
+    err = tx.QueryRow(ctx, classQuery, flightClassID).Scan(&flightClassName)
+    if err != nil {
+        log.Printf("Error getting flight class name: %v", err)
+        flightClassName = "Unknown"
+    }
+
+    // COMMIT TRANSACTION - All operations succeed or all fail
+    err = tx.Commit(ctx)
+    if err != nil {
+        log.Printf("Error committing transaction: %v", err)
+        return nil, fmt.Errorf("error committing transaction: %w", err)
+    }
+
+    log.Printf("Successfully completed atomic checkin for BookingDetailID: %d", checkinRequest.BookingDetailID)
+
+
+    passengerName := fmt.Sprintf("%s %s", firstName, lastName)
+    boardingTime := departureTime.Add(-30 * time.Minute)
+    
+    boardingPass := dto.BoardingPassInfo{
+        BookingDetailID:  checkinRequest.BookingDetailID,
+        PassengerName:    passengerName,
+        BoardingPassCode: checkinRequest.BoardingPassCode,
+        SeatNumber:       checkinRequest.SeatNumber,
+        FlightClassName:  flightClassName,
+        FlightClassID:    flightClassID,   
+        CheckinTime:      checkinRequest.CheckinTime,
+        Status:           "checked_in",
+    }
+
+    response := &dto.OnlineCheckinResponse{
+        BookingID:      bookingID,
+        FlightNumber:   flightNumber,
+        CheckinTime:    checkinRequest.CheckinTime,
+        BoardingTime:   &boardingTime,
+        CheckedInCount: 1,
+        BoardingPasses: []dto.BoardingPassInfo{boardingPass},
+    }
+
+    return response, nil
+}
+

@@ -748,3 +748,4 @@ func (r *bookingRepository) GetBookingsByFlightIDAndStatus(flightID int64, statu
 
     return bookings, nil
 }
+
