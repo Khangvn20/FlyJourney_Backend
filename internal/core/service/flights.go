@@ -111,13 +111,13 @@ func (s *flightService) CreateFlight(req *request.CreateFlightRequest) *response
             ErrorMessage: "Arrival time must be after departure time",
         }
     }
-    if departureTime.Before(time.Now()) {
+   /* if departureTime.Before(time.Now()) {
         return &response.Response{
             Status:       false,
             ErrorCode:    error_code.InvalidRequest,
             ErrorMessage: "Departure time must be in the future",
         }
-    }
+    }*/
     totalSeats := 0
     for _, fc := range req.FlightClasses {
         if fc.TotalSeats <= 0 {

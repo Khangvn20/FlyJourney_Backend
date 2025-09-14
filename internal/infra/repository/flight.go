@@ -661,6 +661,11 @@ func (r *flightRepository) SearchFlights(
         query += " AND f.status IN ('scheduled', 'boarding')"
         query += " AND fc.available_seats > 0"
     }
+       if flightClass != "" && flightClass != "all" {
+        query += fmt.Sprintf(" AND fc.class = $%d", argIndex)
+        args = append(args, flightClass)
+        argIndex++
+    }
 
     // Add sorting
     validSortFields := map[string]string{

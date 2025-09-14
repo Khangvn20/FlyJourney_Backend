@@ -20,6 +20,7 @@ type CheckinValidationResponse struct {
     FlightID         int64                   `json:"flight_id"`
     FlightNumber     string                  `json:"flight_number"`
     DepartureTime    time.Time               `json:"departure_time"`
+    BookingID        int64                   `json:"booking_id"`
     ArrivalTime      time.Time               `json:"arrival_time"`
     DepartureAirport string                  `json:"departure_airport"`
     ArrivalAirport   string                  `json:"arrival_airport"`
@@ -67,6 +68,7 @@ type BoardingPassInfo struct {
     FlightClassName   string    `json:"flight_class_name"`
     CheckinTime       time.Time `json:"checkin_time"`
     Status            string    `json:"status"`
+    FlightClassID   int64     `json:"flight_class_id"`
 }
 
 type OnlineCheckinResponse struct {
@@ -90,4 +92,12 @@ type PassengerInfo struct {
     BookingDetailID  int64  `json:"booking_detail_id"`
     PassengerName    string `json:"passenger_name"`
     FlightClassName  string `json:"flight_class_name"`
+}
+
+type CheckinOnline struct {
+    BookingDetailID   int64     `json:"booking_detail_id"`
+    SeatNumber        string    `json:"seat_number"`
+    FlightID          int64     `json:"flight_id"`
+    BoardingPassCode  string    `json:"boarding_pass_code"`
+    CheckinTime       time.Time `json:"checkin_time"`
 }
