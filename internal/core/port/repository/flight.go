@@ -49,5 +49,6 @@ type FlightRepository interface {
          CountBySearch(departureAirport, arrivalAirport string, departureDate string,forUser bool, ) (int, error)
     // Status updates
     UpdateStatus(id int, status string) error
+    UpdateFlightTime(flightID int, departureTime time.Time, arrivalTime time.Time) error
 
 }

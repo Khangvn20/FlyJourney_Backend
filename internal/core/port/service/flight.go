@@ -1,7 +1,7 @@
 package service
 
 import (
-    "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
+	"github.com/Khangvn20/FlyJourney_Backend/internal/core/model/request"
     "github.com/Khangvn20/FlyJourney_Backend/internal/core/model/response"
 )
 type FlightService interface {
@@ -22,4 +22,7 @@ type FlightService interface {
 	GetFlightByIDForUser(flightID int) *response.Response 
     GetFlightByIDForAdmin(flightID int) *response.Response
 	SearchRoundtripFlightsForUser(req *request.RoundtripFlightSearchRequest) *response.Response
+	CancelFlight(flightID int64, reason string) *response.Response
+	UpdateFlightTime(flightID int64, req *request.UpdateFlightTimeRequest) *response.Response
+	
 }

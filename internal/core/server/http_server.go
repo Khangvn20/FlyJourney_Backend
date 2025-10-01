@@ -16,6 +16,7 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/Khangvn20/FlyJourney_Backend/internal/infra/config"
     "github.com/joho/godotenv"
+    "github.com/Khangvn20/FlyJourney_Backend/internal/worker"
 )
 
 type Server struct {
@@ -84,23 +85,31 @@ func NewHTTPServer(port int) (*Server, error) {
     flightRepo := repository.NewFlightRepository(db.GetPool())
     paymentRepo := repository.NewPaymentRepository(db.GetPool())
     pnrRepo     :=repository.NewPNRRepository(db.GetPool())
+    checkinRepo := repository.NewCheckinRepository(db.GetPool())
     // Initialize services
     redisService := service.NewRedisService(redisClient)
     bookingService := service.NewBookingService(bookingRepo,redisService, pnrRepo)
     emailOTPService := service.NewEmailOTPService()
      tokenService := utils.NewTokenService(redisService)
     userService := service.NewUserService(userRepo, emailOTPService, tokenService)
-    flightService := service.NewFlightService(flightRepo)
-    bookingEmailService := service.NewBookingEmailService(bookingRepo, flightRepo, pnrRepo, userRepo, paymentRepo, emailOTPService)
+    flightService := service.NewFlightService(flightRepo,redisService, bookingRepo)
+    bookingEmailService := service.NewBookingEmailService(bookingRepo, flightRepo, pnrRepo, userRepo, paymentRepo, emailOTPService, redisService)
     paymentService := service.NewPaymentService(momoConfig, bookingRepo, paymentRepo, bookingEmailService)
-
+    checkinService := service.NewCheckinService(checkinRepo,bookingRepo)
     // Initialize controller
     bookingController := controller.NewBookingController(bookingService)
     userController := controller.NewUserController(userService)
-    flightController := controller.NewFlightController(flightService)
+    flightController := controller.NewFlightController(flightService,bookingEmailService)
     paymentController := controller.NewPaymentController(paymentService)
     bookingEmailController := controller.NewEmailController(bookingEmailService)
-
+    checkinController := controller.NewCheckinController(checkinService)
+    //Initialize Notification Worker
+    emailNotificationWorker := worker.NewEmailNotificationWorker(redisService, bookingEmailService, 5*time.Minute)
+    emailNotificationWorker.Start()
+    go func() {
+        log.Println("Email notification worker started")
+        emailNotificationWorker.Start()
+    }()
 
     // Setup router
     r.Use(gin.Recovery())
@@ -112,6 +121,7 @@ func NewHTTPServer(port int) (*Server, error) {
     router.BookingRoutes(apiV1, bookingController, middleware.AuthMiddleware(tokenService))
     router.PaymentRoutes(apiV1, paymentController, middleware.AuthMiddleware(tokenService))
     router.BookingEmailRoute(apiV1, bookingEmailController,)
+    router.CheckinRoutes(apiV1, checkinController)
 
     
     return &Server{

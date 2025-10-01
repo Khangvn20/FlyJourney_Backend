@@ -102,3 +102,19 @@ func (s *redisService) Expire(key string, expiration time.Duration) error {
     }
     return nil
 }
+func (r *redisService) SetJSON(key string, value interface{}, expiration time.Duration) error {
+    ctx := context.Background()
+    jsonData, err := json.Marshal(value)
+    if err != nil {
+        return err
+    }
+    return r.client.Set(ctx, key, jsonData, expiration).Err()
+}
+func (r *redisService) Keys(pattern string) ([]string, error) {
+    ctx := context.Background()
+    keys, err := r.client.Keys(ctx, pattern).Result()
+    if err != nil {
+        return nil, err
+    }
+    return keys, nil
+}

@@ -29,7 +29,9 @@ func FlightRoutes(rg *gin.RouterGroup, flightController *controller.FlightContro
         adminRoutes.GET("/:id", flightController.GetFlightByID)
         adminRoutes.POST("/search", flightController.SearchFlights)
         adminRoutes.GET("/fareclasses/:id", flightController.GetFareCLassCode)
+        adminRoutes.POST("/update-time/:id", flightController.UpdateFlightTime)
         adminRoutes.POST("/search/roundtrip", flightController.SearchRoundtripFlights)
+        adminRoutes.POST("/queue-delay", flightController.QueueDelayNotifications)
     }
 	}
 	
